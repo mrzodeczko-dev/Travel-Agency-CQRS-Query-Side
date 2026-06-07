@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "AvailabilityUpdatedAvro",
+  "namespace": "com.app.avro",
+  "fields": [
+    {
+      "name": "hotelId",
+      "type": "long"
+    },
+    {
+      "name": "date",
+      "type": "string"
+    },
+    {
+      "name": "occupied",
+      "type": "long"
+    }
+  ]
+}

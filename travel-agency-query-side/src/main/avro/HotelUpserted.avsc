@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "HotelUpsertedAvro",
+  "namespace": "com.app.avro",
+  "fields": [
+    {
+      "name": "hotelId",
+      "type": "long"
+    },
+    {
+      "name": "capacity",
+      "type": "int"
+    }
+  ]
+}

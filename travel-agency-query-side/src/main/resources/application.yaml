@@ -1,0 +1,62 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:travel-agency-query-side}
+
+  threads:
+    virtual:
+      enabled: true
+
+  mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI}
+  data:
+    mongodb:
+      auto-index-creation: true
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    properties:
+      schema.registry.url: ${SPRING_KAFKA_SCHEMA_REGISTRY_URL}
+    streams:
+      application-id: ${KAFKA_STREAMS_APPLICATION_ID}
+      properties:
+        processing.guarantee: exactly_once_v2
+        schema.registry.url: ${SPRING_KAFKA_SCHEMA_REGISTRY_URL}
+        num.stream.threads: ${KAFKA_STREAMS_THREADS}
+        state.dir: ${KAFKA_STREAMS_STATE_DIR}
+        default.deserialization.exception.handler: org.apache.kafka.streams.errors.LogAndContinueExceptionHandler
+    consumer:
+      group-id: ${KAFKA_PROJECTION_GROUP_ID}
+      auto-offset-reset: earliest
+      properties:
+        key.deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+        value.deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        specific.avro.reader: true
+        schema.registry.url: ${SPRING_KAFKA_SCHEMA_REGISTRY_URL}
+    listener:
+      ack-mode: record
+
+app:
+  topics:
+    bookings: ${TOPIC_BOOKINGS}
+    daily-availability: ${TOPIC_DAILY_AVAILABILITY}
+    daily-availability-dlt: ${TOPIC_DAILY_AVAILABILITY_DLT}
+    hotels: ${TOPIC_HOTELS}
+    hotels-dlt: ${TOPIC_HOTELS_DLT}
+  last-rooms-threshold: ${LAST_ROOMS_THRESHOLD}
+  hotels:
+    default-capacity: ${DEFAULT_HOTEL_CAPACITY}
+    consumer-group: ${HOTELS_CONSUMER_GROUP}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when_authorized
