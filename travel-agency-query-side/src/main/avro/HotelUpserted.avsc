@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "HotelUpsertedAvro",
-  "namespace": "com.app.avro",
+  "namespace": "com.rzodeczko.avro",
   "fields": [
     {
       "name": "hotelId",
