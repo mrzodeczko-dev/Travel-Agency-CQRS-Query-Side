@@ -8,6 +8,6 @@ public record AppTopicsProperties(
         String dailyAvailability,
         String dailyAvailabilityDlt,
         String hotels,
-        String hotelCapacity
+        String hotelsDlt
 ) {
 }

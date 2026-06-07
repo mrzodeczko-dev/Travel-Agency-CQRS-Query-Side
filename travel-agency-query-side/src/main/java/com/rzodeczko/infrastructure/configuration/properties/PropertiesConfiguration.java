@@ -1,7 +1,8 @@
 package com.rzodeczko.infrastructure.configuration.properties;
 
+import com.rzodeczko.infrastructure.capacity.properteis.HotelCapacityProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-@EnableConfigurationProperties(AppTopicsProperties.class)
+@EnableConfigurationProperties({HotelCapacityProperties.class, AppTopicsProperties.class})
 public class PropertiesConfiguration {
 }
