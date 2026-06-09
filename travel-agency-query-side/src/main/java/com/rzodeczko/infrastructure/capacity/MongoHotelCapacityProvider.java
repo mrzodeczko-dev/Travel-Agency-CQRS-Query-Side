@@ -20,7 +20,7 @@ public class MongoHotelCapacityProvider implements HotelCapacityProvider, HotelC
     private final MongoHotelRepository hotelRepository;
     private final HotelCapacityProvider fallback;
 
-    private final ConcurrentMap<Long, Integer> cache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, Long> cache = new ConcurrentHashMap<>();
 
     public MongoHotelCapacityProvider(
             MongoHotelRepository hotelRepository,
@@ -30,8 +30,8 @@ public class MongoHotelCapacityProvider implements HotelCapacityProvider, HotelC
     }
 
     @Override
-    public int getCapacity(long hotelId) {
-        Integer cached = cache.get(hotelId);
+    public long getCapacity(long hotelId) {
+        Long cached = cache.get(hotelId);
         if (cached != null) {
             return cached;
         }
@@ -42,7 +42,7 @@ public class MongoHotelCapacityProvider implements HotelCapacityProvider, HotelC
                     return doc.getCapacity();
                 })
                 .orElseGet(() -> {
-                    int fallbackCapacity = fallback.getCapacity(hotelId);
+                    long fallbackCapacity = fallback.getCapacity(hotelId);
                     log.warn(
                             "No capacity for hotelId={} in Read Model yet. Using fallback: {}. " +
                                     "Ensure hotel is created via POST /api/hotels before accepting bookings.",

@@ -1,8 +1,8 @@
 package com.rzodeczko.application.port.out;
 
 
-import com.rzodeczko.domain.model.DailyAvailability;
+import com.rzodeczko.domain.model.Availability;
 
 public interface AvailabilityWriteRepository {
-    void upsert(DailyAvailability availability);
+    void upsert(Availability availability);
 }

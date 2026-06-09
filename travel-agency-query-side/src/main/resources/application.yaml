@@ -43,8 +43,8 @@ spring:
 app:
   topics:
     bookings: ${TOPIC_BOOKINGS}
-    daily-availability: ${TOPIC_DAILY_AVAILABILITY}
-    daily-availability-dlt: ${TOPIC_DAILY_AVAILABILITY_DLT}
+    availability: ${TOPIC_AVAILABILITY}
+    availability-dlt: ${TOPIC_AVAILABILITY_DLT}
     hotels: ${TOPIC_HOTELS}
     hotels-dlt: ${TOPIC_HOTELS_DLT}
   last-rooms-threshold: ${LAST_ROOMS_THRESHOLD}

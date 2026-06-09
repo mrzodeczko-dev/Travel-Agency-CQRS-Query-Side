@@ -6,7 +6,7 @@ import com.rzodeczko.application.port.out.AvailabilityWriteRepository;
 import com.rzodeczko.application.port.out.HotelCapacityWriteRepository;
 import com.rzodeczko.domain.model.AvailabilityStatus;
 import com.rzodeczko.domain.model.AvailabilityStatusPolicy;
-import com.rzodeczko.domain.model.DailyAvailability;
+import com.rzodeczko.domain.model.Availability;
 
 import java.util.List;
 
@@ -25,17 +25,17 @@ public class HotelCapacityService implements UpsertHotelCapacityUseCase {
     }
 
     @Override
-    public void upsert(long hotelId, int capacity) {
+    public void upsert(long hotelId, long capacity) {
         hotelCapacityWriteRepository.save(hotelId, capacity);
         reprojectHotelDays(hotelId, capacity);
     }
 
-    private void reprojectHotelDays(long hotelId, int capacity) {
-        List<DailyAvailability> days = availabilityRepository.findByHotel(hotelId, null, null);
+    private void reprojectHotelDays(long hotelId, long capacity) {
+        List<Availability> days = availabilityRepository.findByHotel(hotelId, null, null);
 
-        for (DailyAvailability day : days) {
+        for (Availability day : days) {
             AvailabilityStatus newStatus = availabilityStatusPolicy.evaluate(day.getOccupied(), capacity);
-            DailyAvailability corrected = new DailyAvailability(
+            Availability corrected = new Availability(
                     day.getHotelId(),
                     day.getDate(),
                     day.getOccupied(),

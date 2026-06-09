@@ -15,7 +15,7 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DailyAvailabilityDocument {
+public class AvailabilityDocument {
 
     @Id
     private String id;

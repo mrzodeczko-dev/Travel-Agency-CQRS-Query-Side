@@ -2,14 +2,14 @@ package com.rzodeczko.domain.model;
 
 import java.time.LocalDate;
 
-public class DailyAvailability {
+public class Availability {
     private final long hotelId;
     private final LocalDate date;
     private final long occupied;
     private final long capacity;
     private final AvailabilityStatus status;
 
-    public DailyAvailability(long hotelId, LocalDate date, long occupied, long capacity, AvailabilityStatus status) {
+    public Availability(long hotelId, LocalDate date, long occupied, long capacity, AvailabilityStatus status) {
 
         if (occupied < 0) {
             throw new IllegalArgumentException("Occupied cannot be negative");

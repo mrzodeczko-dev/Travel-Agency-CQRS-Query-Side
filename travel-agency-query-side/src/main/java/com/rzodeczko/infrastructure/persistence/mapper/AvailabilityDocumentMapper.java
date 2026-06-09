@@ -1,17 +1,17 @@
 package com.rzodeczko.infrastructure.persistence.mapper;
 
-import com.rzodeczko.domain.model.DailyAvailability;
-import com.rzodeczko.infrastructure.persistence.document.DailyAvailabilityDocument;
+import com.rzodeczko.domain.model.Availability;
+import com.rzodeczko.infrastructure.persistence.document.AvailabilityDocument;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
 @Component
-public class DailyAvailabilityDocumentMapper {
+public class AvailabilityDocumentMapper {
 
-    public DailyAvailabilityDocument toDocument(DailyAvailability domain) {
-        return DailyAvailabilityDocument.builder()
-                .id(DailyAvailabilityDocument.buildId(domain.getHotelId(), domain.getDate()))
+    public AvailabilityDocument toDocument(Availability domain) {
+        return AvailabilityDocument.builder()
+                .id(AvailabilityDocument.buildId(domain.getHotelId(), domain.getDate()))
                 .hotelId(domain.getHotelId())
                 .date(domain.getDate())
                 .occupied(domain.getOccupied())
@@ -21,8 +21,8 @@ public class DailyAvailabilityDocumentMapper {
                 .build();
     }
 
-    public DailyAvailability toDomain(DailyAvailabilityDocument doc) {
-        return new DailyAvailability(
+    public Availability toDomain(AvailabilityDocument doc) {
+        return new Availability(
                 doc.getHotelId(),
                 doc.getDate(),
                 doc.getOccupied(),

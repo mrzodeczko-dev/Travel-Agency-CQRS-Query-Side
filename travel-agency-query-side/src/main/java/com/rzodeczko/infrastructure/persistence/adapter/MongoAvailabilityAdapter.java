@@ -2,9 +2,9 @@ package com.rzodeczko.infrastructure.persistence.adapter;
 
 import com.rzodeczko.application.port.out.AvailabilityReadRepository;
 import com.rzodeczko.application.port.out.AvailabilityWriteRepository;
-import com.rzodeczko.domain.model.DailyAvailability;
-import com.rzodeczko.infrastructure.persistence.document.DailyAvailabilityDocument;
-import com.rzodeczko.infrastructure.persistence.mapper.DailyAvailabilityDocumentMapper;
+import com.rzodeczko.domain.model.Availability;
+import com.rzodeczko.infrastructure.persistence.document.AvailabilityDocument;
+import com.rzodeczko.infrastructure.persistence.mapper.AvailabilityDocumentMapper;
 import com.rzodeczko.infrastructure.persistence.repository.MongoDailyAvailabilityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -24,11 +24,11 @@ public class MongoAvailabilityAdapter implements
 
     private final MongoTemplate mongoTemplate;
     private final MongoDailyAvailabilityRepository repository;
-    private final DailyAvailabilityDocumentMapper mapper;
+    private final AvailabilityDocumentMapper mapper;
 
     @Override
-    public List<DailyAvailability> findByHotel(long hotelId, LocalDate from, LocalDate to) {
-        List<DailyAvailabilityDocument> docs = from != null && to != null ?
+    public List<Availability> findByHotel(long hotelId, LocalDate from, LocalDate to) {
+        List<AvailabilityDocument> docs = from != null && to != null ?
                 repository.findByHotelIdAndDateBetweenOrderByDateAsc(hotelId, from, to) :
                 repository.findByHotelIdOrderByDateAsc(hotelId);
 
@@ -38,8 +38,8 @@ public class MongoAvailabilityAdapter implements
     }
 
     @Override
-    public void upsert(DailyAvailability availability) {
-        String id = DailyAvailabilityDocument.buildId(availability.getHotelId(), availability.getDate());
+    public void upsert(Availability availability) {
+        String id = AvailabilityDocument.buildId(availability.getHotelId(), availability.getDate());
         Query query = Query.query(Criteria.where("_id").is(id));
 
         Update update = new Update()
@@ -50,6 +50,6 @@ public class MongoAvailabilityAdapter implements
                 .set("status", availability.getStatus())
                 .set("updatedAt", System.currentTimeMillis());
 
-        mongoTemplate.upsert(query, update, DailyAvailabilityDocument.class);
+        mongoTemplate.upsert(query, update, AvailabilityDocument.class);
     }
 }

@@ -6,7 +6,7 @@ import java.util.Map;
 
 @ConfigurationProperties(prefix = "app.hotels")
 public record HotelCapacityProperties(
-        int defaultCapacity,
-        Map<Long, Integer> overrides
+        long defaultCapacity,
+        Map<Long, Long> overrides
         ) {
 }

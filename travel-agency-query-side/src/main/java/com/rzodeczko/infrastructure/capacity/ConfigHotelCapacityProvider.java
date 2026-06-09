@@ -11,7 +11,7 @@ public class ConfigHotelCapacityProvider implements HotelCapacityProvider {
     private final HotelCapacityProperties properties;
 
     @Override
-    public int getCapacity(long hotelId) {
+    public long getCapacity(long hotelId) {
         if (properties.overrides() != null && properties.overrides().containsKey(hotelId)) {
             return properties.overrides().get(hotelId);
         }

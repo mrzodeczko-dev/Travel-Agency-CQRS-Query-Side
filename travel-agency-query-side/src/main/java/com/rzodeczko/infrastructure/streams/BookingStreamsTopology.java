@@ -80,7 +80,7 @@ public class BookingStreamsTopology {
                     return KeyValue.pair(String.valueOf(hotelId), value);
                 });
 
-        output.to(topics.dailyAvailability(), Produced.with(Serdes.String(), availabilitySerde));
+        output.to(topics.availability(), Produced.with(Serdes.String(), availabilitySerde));
         return output;
     }
 }

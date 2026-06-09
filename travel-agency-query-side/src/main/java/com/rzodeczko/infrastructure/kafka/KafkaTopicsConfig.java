@@ -15,7 +15,7 @@ public class KafkaTopicsConfig {
     @Bean
     public NewTopic dailyAvailabilityTopic() {
         return TopicBuilder
-                .name(topics.dailyAvailability())
+                .name(topics.availability())
                 .partitions(3)
                 .replicas(1)
                 .build();
@@ -24,7 +24,7 @@ public class KafkaTopicsConfig {
     @Bean
     public NewTopic dailyAvailabilityDltTopic() {
         return TopicBuilder
-                .name(topics.dailyAvailabilityDlt())
+                .name(topics.availabilityDlt())
                 .partitions(3)
                 .replicas(1)
                 .build();

@@ -8,7 +8,7 @@ import com.rzodeczko.application.port.out.AvailabilityWriteRepository;
 import com.rzodeczko.application.port.out.HotelCapacityProvider;
 import com.rzodeczko.domain.model.AvailabilityStatus;
 import com.rzodeczko.domain.model.AvailabilityStatusPolicy;
-import com.rzodeczko.domain.model.DailyAvailability;
+import com.rzodeczko.domain.model.Availability;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,11 +33,11 @@ public class AvailabilityService implements UpdateAvailabilityUseCase, GetAvaila
 
     @Override
     public void update(UpdateAvailabilityCommand command) {
-        int capacity = hotelCapacityProvider.getCapacity(command.hotelId());
+        long capacity = hotelCapacityProvider.getCapacity(command.hotelId());
 
         AvailabilityStatus status = availabilityStatusPolicy.evaluate(command.occupied(), capacity);
 
-        DailyAvailability availability = new DailyAvailability(
+        Availability availability = new Availability(
                 command.hotelId(),
                 command.date(),
                 command.occupied(),
@@ -49,7 +49,7 @@ public class AvailabilityService implements UpdateAvailabilityUseCase, GetAvaila
     }
 
     @Override
-    public List<DailyAvailability> getForHotel(long hotelId, LocalDate from, LocalDate to) {
+    public List<Availability> getForHotel(long hotelId, LocalDate from, LocalDate to) {
         return availabilityReadRepository.findByHotel(hotelId, from, to);
     }
 }

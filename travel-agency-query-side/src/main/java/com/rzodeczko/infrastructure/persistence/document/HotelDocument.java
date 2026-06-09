@@ -14,5 +14,5 @@ public class HotelDocument {
 
     @Id
     private Long id;
-    private int capacity;
+    private long capacity;
 }
