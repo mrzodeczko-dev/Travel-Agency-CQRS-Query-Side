@@ -46,7 +46,7 @@ class BookingStreamsTopologyTest {
     void setUp() {
         AppTopicsProperties topics = new AppTopicsProperties(
                 BOOKINGS_TOPIC, AVAILABILITY_TOPIC, "travel.availability.DLT",
-                "travel.hotels", "travel.hotels.DLT"
+                "travel.hotels", "travel.hotels.DLT", 1, 1
         );
 
         BookingStreamsTopology topologyConfig = new BookingStreamsTopology(topics);

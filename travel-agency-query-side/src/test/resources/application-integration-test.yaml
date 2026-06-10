@@ -43,6 +43,8 @@ app:
     availability-dlt: travel.availability.DLT
     hotels: travel.hotels
     hotels-dlt: travel.hotels.DLT
+    partitions: 1
+    replicas: 1
   last-rooms-threshold: 0.9
   hotels:
     default-capacity: 100

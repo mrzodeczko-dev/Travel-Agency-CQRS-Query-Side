@@ -47,6 +47,8 @@ app:
     availability-dlt: ${TOPIC_AVAILABILITY_DLT}
     hotels: ${TOPIC_HOTELS}
     hotels-dlt: ${TOPIC_HOTELS_DLT}
+    partitions: ${TOPIC_PARTITIONS:3}
+    replicas: ${TOPIC_REPLICAS:1}
   last-rooms-threshold: ${LAST_ROOMS_THRESHOLD}
   hotels:
     default-capacity: ${DEFAULT_HOTEL_CAPACITY} # Fallback capacity for hotels without availability information

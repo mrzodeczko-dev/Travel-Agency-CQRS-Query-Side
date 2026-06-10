@@ -16,8 +16,8 @@ public class KafkaTopicsConfig {
     public NewTopic availabilityTopic() {
         return TopicBuilder
                 .name(topics.availability())
-                .partitions(3)
-                .replicas(1)
+                .partitions(topics.partitions())
+                .replicas(topics.replicas())
                 .build();
     }
 
@@ -25,8 +25,8 @@ public class KafkaTopicsConfig {
     public NewTopic availabilityDltTopic() {
         return TopicBuilder
                 .name(topics.availabilityDlt())
-                .partitions(3)
-                .replicas(1)
+                .partitions(topics.partitions())
+                .replicas(topics.replicas())
                 .build();
     }
 
@@ -34,8 +34,8 @@ public class KafkaTopicsConfig {
     public NewTopic hotelsDltTopic() {
         return TopicBuilder
                 .name(topics.hotelsDlt())
-                .partitions(3)
-                .replicas(1)
+                .partitions(topics.partitions())
+                .replicas(topics.replicas())
                 .build();
     }
 }
