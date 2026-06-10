@@ -1,5 +1,8 @@
 package com.rzodeczko.infrastructure.capacity;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.rzodeczko.application.port.out.HotelCapacityProvider;
 import com.rzodeczko.application.port.out.HotelCapacityWriteRepository;
 import com.rzodeczko.infrastructure.persistence.document.HotelDocument;
@@ -9,8 +12,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.time.Duration;
 
 
 @Component
@@ -20,7 +22,10 @@ public class MongoHotelCapacityProvider implements HotelCapacityProvider, HotelC
     private final MongoHotelRepository hotelRepository;
     private final HotelCapacityProvider fallback;
 
-    private final ConcurrentMap<Long, Long> cache = new ConcurrentHashMap<>();
+    private final Cache<Long, Long> cache = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterWrite(Duration.ofMinutes(30))
+            .build();
 
     public MongoHotelCapacityProvider(
             MongoHotelRepository hotelRepository,
@@ -31,7 +36,7 @@ public class MongoHotelCapacityProvider implements HotelCapacityProvider, HotelC
 
     @Override
     public long getCapacity(long hotelId) {
-        Long cached = cache.get(hotelId);
+        Long cached = cache.getIfPresent(hotelId);
         if (cached != null) {
             return cached;
         }

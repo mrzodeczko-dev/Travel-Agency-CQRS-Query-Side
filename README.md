@@ -122,7 +122,7 @@ Base URL (local): `http://localhost:${SERVER_PORT}` (default: `8081`)
 
 | Method | Path | Description | Query params | Success | Error codes |
 |--------|------|-------------|-------------|---------|-------------|
-| `GET` | `/api/availability/{hotelId}` | Get availability for a hotel | `from` (ISO date, optional), `to` (ISO date, optional) | `200 OK` | `400` (invalid date range) |
+| `GET` | `/api/availability/{hotelId}` | Get availability for a hotel | `from` (ISO date, optional), `to` (ISO date, optional), `page` (int, default `0`), `size` (int, default `30`, max `100`) | `200 OK` | `400` (invalid date range) |
 | `GET` | `/actuator/health` | Spring Boot Actuator health | — | `200 OK` | — |
 
 ### cURL examples
@@ -134,24 +134,30 @@ curl "http://localhost:8081/api/availability/1?from=2024-06-01&to=2024-06-07"
 
 Example response (`200 OK`):
 ```json
-[
-  {
-    "hotelId": 1,
-    "date": "2024-06-01",
-    "occupied": 45,
-    "capacity": 100,
-    "freeRooms": 55,
-    "status": "AVAILABLE"
-  },
-  {
-    "hotelId": 1,
-    "date": "2024-06-02",
-    "occupied": 93,
-    "capacity": 100,
-    "freeRooms": 7,
-    "status": "LAST_ROOMS"
-  }
-]
+{
+  "content": [
+    {
+      "hotelId": 1,
+      "date": "2024-06-01",
+      "occupied": 45,
+      "capacity": 100,
+      "freeRooms": 55,
+      "status": "AVAILABLE"
+    },
+    {
+      "hotelId": 1,
+      "date": "2024-06-02",
+      "occupied": 93,
+      "capacity": 100,
+      "freeRooms": 7,
+      "status": "LAST_ROOMS"
+    }
+  ],
+  "page": 0,
+  "size": 30,
+  "totalElements": 2,
+  "totalPages": 1
+}
 ```
 
 **Get all availability (no date filter):**
@@ -459,8 +465,6 @@ travel-agency-query-side/
 
 [↑ Back to top](#toc)
 
-- **Scroll query for re-projection** — `HotelCapacityService.reprojectHotelDays` currently loads all records for a hotel into memory. For large datasets this should use cursor-based pagination.
-- **Pagination on the availability endpoint** — `GET /api/availability/{hotelId}` without a date range returns all records with no limit.
 - **Booking cancellations** — the Kafka Streams topology only counts bookings upward; a cancellation event model and corresponding deduction logic is missing.
 
 ---

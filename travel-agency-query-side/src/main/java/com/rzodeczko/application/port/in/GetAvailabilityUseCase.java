@@ -8,4 +8,8 @@ import java.util.List;
 
 public interface GetAvailabilityUseCase {
     List<Availability> getForHotel(long hotelId, LocalDate from, LocalDate to);
+
+    List<Availability> getForHotel(long hotelId, LocalDate from, LocalDate to, int page, int size);
+
+    long countForHotel(long hotelId, LocalDate from, LocalDate to);
 }

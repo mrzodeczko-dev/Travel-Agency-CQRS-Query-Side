@@ -7,6 +7,8 @@ import com.rzodeczko.infrastructure.persistence.document.AvailabilityDocument;
 import com.rzodeczko.infrastructure.persistence.mapper.AvailabilityDocumentMapper;
 import com.rzodeczko.infrastructure.persistence.repository.MongoDailyAvailabilityRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.ScrollPosition;
 import org.springframework.data.domain.Window;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -39,6 +41,43 @@ public class MongoAvailabilityAdapter implements
         return docs.stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<Availability> findByHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
+        var pageable = PageRequest.of(page, size);
+        var docs = from != null && to != null
+                ? repository.findByHotelIdAndDateBetweenOrderByDateAsc(hotelId, from, to, pageable)
+                : repository.findByHotelIdOrderByDateAsc(hotelId, pageable);
+
+        return docs.getContent().stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countByHotel(long hotelId, LocalDate from, LocalDate to) {
+        return from != null && to != null
+                ? repository.countByHotelIdAndDateBetween(hotelId, from, to)
+                : repository.countByHotelId(hotelId);
+    }
+
+    @Override
+    public void forEachByHotel(long hotelId, Consumer<Availability> action) {
+        ScrollPosition position = ScrollPosition.keyset();
+        boolean hasMore = true;
+
+        while (hasMore) {
+            Window<AvailabilityDocument> window = repository.findByHotelIdOrderByDateAsc(
+                    hotelId, position, Limit.of(500));
+
+            window.forEach(doc -> action.accept(mapper.toDomain(doc)));
+
+            hasMore = window.hasNext();
+            if (hasMore) {
+                position = window.positionAt(window.size() - 1);
+            }
+        }
     }
 
     @Override

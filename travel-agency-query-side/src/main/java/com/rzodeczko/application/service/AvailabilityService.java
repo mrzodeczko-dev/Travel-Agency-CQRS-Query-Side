@@ -52,4 +52,14 @@ public class AvailabilityService implements UpdateAvailabilityUseCase, GetAvaila
     public List<Availability> getForHotel(long hotelId, LocalDate from, LocalDate to) {
         return availabilityReadRepository.findByHotel(hotelId, from, to);
     }
+
+    @Override
+    public List<Availability> getForHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
+        return availabilityReadRepository.findByHotel(hotelId, from, to, page, size);
+    }
+
+    @Override
+    public long countForHotel(long hotelId, LocalDate from, LocalDate to) {
+        return availabilityReadRepository.countByHotel(hotelId, from, to);
+    }
 }

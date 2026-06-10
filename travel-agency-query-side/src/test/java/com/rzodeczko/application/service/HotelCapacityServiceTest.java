@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -39,9 +40,18 @@ class HotelCapacityServiceTest {
         service = new HotelCapacityService(capacityWriteRepository, readRepository, writeRepository, policy);
     }
 
+    @SuppressWarnings("unchecked")
+    private void stubForEachByHotel(long hotelId, List<Availability> days) {
+        doAnswer(invocation -> {
+            Consumer<Availability> action = invocation.getArgument(1);
+            days.forEach(action);
+            return null;
+        }).when(readRepository).forEachByHotel(eq(hotelId), any(Consumer.class));
+    }
+
     @Test
     void shouldSaveNewCapacity() {
-        when(readRepository.findByHotel(HOTEL_ID, null, null)).thenReturn(List.of());
+        stubForEachByHotel(HOTEL_ID, List.of());
 
         service.upsert(HOTEL_ID, 200L);
 
@@ -52,7 +62,7 @@ class HotelCapacityServiceTest {
     void shouldReprojectExistingDaysWithNewCapacity() {
         LocalDate date = LocalDate.of(2024, 6, 1);
         Availability existing = new Availability(HOTEL_ID, date, 50, 100, AvailabilityStatus.AVAILABLE);
-        when(readRepository.findByHotel(HOTEL_ID, null, null)).thenReturn(List.of(existing));
+        stubForEachByHotel(HOTEL_ID, List.of(existing));
 
         service.upsert(HOTEL_ID, 200L);
 
@@ -71,7 +81,7 @@ class HotelCapacityServiceTest {
         LocalDate date = LocalDate.of(2024, 6, 1);
         // occupied=90 przy capacity=100 → LAST_ROOMS, ale przy capacity=200 → AVAILABLE
         Availability existing = new Availability(HOTEL_ID, date, 90, 100, AvailabilityStatus.LAST_ROOMS);
-        when(readRepository.findByHotel(HOTEL_ID, null, null)).thenReturn(List.of(existing));
+        stubForEachByHotel(HOTEL_ID, List.of(existing));
 
         service.upsert(HOTEL_ID, 200L);
 
@@ -88,7 +98,7 @@ class HotelCapacityServiceTest {
                 new Availability(HOTEL_ID, LocalDate.of(2024, 6, 2), 20, 100, AvailabilityStatus.AVAILABLE),
                 new Availability(HOTEL_ID, LocalDate.of(2024, 6, 3), 30, 100, AvailabilityStatus.AVAILABLE)
         );
-        when(readRepository.findByHotel(HOTEL_ID, null, null)).thenReturn(days);
+        stubForEachByHotel(HOTEL_ID, days);
 
         service.upsert(HOTEL_ID, 150L);
 
@@ -97,7 +107,7 @@ class HotelCapacityServiceTest {
 
     @Test
     void shouldNotCallWriteRepositoryWhenHotelHasNoDays() {
-        when(readRepository.findByHotel(HOTEL_ID, null, null)).thenReturn(List.of());
+        stubForEachByHotel(HOTEL_ID, List.of());
 
         service.upsert(HOTEL_ID, 100L);
 

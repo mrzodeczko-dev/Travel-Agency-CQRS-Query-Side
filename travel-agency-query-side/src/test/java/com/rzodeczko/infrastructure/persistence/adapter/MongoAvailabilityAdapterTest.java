@@ -61,7 +61,7 @@ class MongoAvailabilityAdapterTest {
 
         assertThat(result).containsExactly(domain);
         verify(repository).findByHotelIdAndDateBetweenOrderByDateAsc(HOTEL_ID, from, to);
-        verify(repository, never()).findByHotelIdOrderByDateAsc(anyLong());
+        verify(repository, never()).findByHotelIdOrderByDateAsc(HOTEL_ID);
     }
 
     @Test

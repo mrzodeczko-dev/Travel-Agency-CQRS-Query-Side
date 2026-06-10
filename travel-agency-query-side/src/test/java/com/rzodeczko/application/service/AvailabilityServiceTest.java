@@ -121,4 +121,29 @@ class AvailabilityServiceTest {
 
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void shouldDelegatePagedQueryToRepository() {
+        LocalDate from = LocalDate.of(2024, 6, 1);
+        LocalDate to = LocalDate.of(2024, 6, 7);
+        List<Availability> expected = List.of(
+                new Availability(HOTEL_ID, from, 10, 100, AvailabilityStatus.AVAILABLE)
+        );
+        when(readRepository.findByHotel(HOTEL_ID, from, to, 0, 30)).thenReturn(expected);
+
+        List<Availability> result = service.getForHotel(HOTEL_ID, from, to, 0, 30);
+
+        assertThat(result).isEqualTo(expected);
+        verify(readRepository).findByHotel(HOTEL_ID, from, to, 0, 30);
+    }
+
+    @Test
+    void shouldDelegateCountToRepository() {
+        when(readRepository.countByHotel(HOTEL_ID, null, null)).thenReturn(42L);
+
+        long count = service.countForHotel(HOTEL_ID, null, null);
+
+        assertThat(count).isEqualTo(42L);
+        verify(readRepository).countByHotel(HOTEL_ID, null, null);
+    }
 }

@@ -8,8 +8,6 @@ import com.rzodeczko.domain.model.AvailabilityStatus;
 import com.rzodeczko.domain.model.AvailabilityStatusPolicy;
 import com.rzodeczko.domain.model.Availability;
 
-import java.util.List;
-
 public class HotelCapacityService implements UpsertHotelCapacityUseCase {
 
     private final HotelCapacityWriteRepository hotelCapacityWriteRepository;
@@ -31,9 +29,7 @@ public class HotelCapacityService implements UpsertHotelCapacityUseCase {
     }
 
     private void reprojectHotelDays(long hotelId, long capacity) {
-        List<Availability> days = availabilityRepository.findByHotel(hotelId, null, null);
-
-        for (Availability day : days) {
+        availabilityRepository.forEachByHotel(hotelId, day -> {
             AvailabilityStatus newStatus = availabilityStatusPolicy.evaluate(day.getOccupied(), capacity);
             Availability corrected = new Availability(
                     day.getHotelId(),
@@ -43,6 +39,6 @@ public class HotelCapacityService implements UpsertHotelCapacityUseCase {
                     newStatus
             );
             availabilityWriteRepository.upsert(corrected);
-        }
+        });
     }
 }
