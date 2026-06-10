@@ -13,15 +13,6 @@ public class KafkaTopicsConfig {
     private final AppTopicsProperties topics;
 
     @Bean
-    public NewTopic availabilityTopic() {
-        return TopicBuilder
-                .name(topics.availability())
-                .partitions(topics.partitions())
-                .replicas(topics.replicas())
-                .build();
-    }
-
-    @Bean
     public NewTopic availabilityDltTopic() {
         return TopicBuilder
                 .name(topics.availabilityDlt())

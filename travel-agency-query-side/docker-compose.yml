@@ -33,6 +33,26 @@ services:
   # KAFKA
   # --------------------------------------------------------------------------------------------------------------------
 
+  liquibase-mongo:
+    build:
+      context: ./db
+      dockerfile: Dockerfile-liquibase
+    container_name: liquibase-mongo
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command:
+      - --search-path=/liquibase/changelog
+      - --changelog-file=master.yaml
+      - --url=mongodb://mongodb:27017/${MONGO_DB_NAME}?authSource=admin
+      - --username=${MONGO_USER}
+      - --password=${MONGO_PASSWORD}
+      - --log-level=info
+      - update
+    networks:
+      - mr-network
+
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka-single
@@ -72,6 +92,23 @@ services:
     networks:
       - mr-network
 
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ "bash", "-c", "
+      echo 'Creating Kafka topics...' &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${TOPIC_BOOKINGS} --partitions ${TOPIC_PARTITIONS:-3} --replication-factor ${TOPIC_REPLICAS:-1} &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${TOPIC_AVAILABILITY} --partitions ${TOPIC_PARTITIONS:-3} --replication-factor ${TOPIC_REPLICAS:-1} &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${TOPIC_HOTELS} --partitions ${TOPIC_PARTITIONS:-3} --replication-factor ${TOPIC_REPLICAS:-1} &&
+      echo 'All topics created successfully'
+      " ]
+    restart: "no"
+    networks:
+      - mr-network
+
   kafka-ui:
     image: provectuslabs/kafka-ui:0.3.3
     container_name: kafka-ui
@@ -106,6 +143,8 @@ services:
         condition: service_healthy
       schema-registry:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       SERVER_PORT: ${QUERY_SIDE_SERVICE_PORT}
       SPRING_APPLICATION_NAME: ${QUERY_SIDE_SERVICE_APPLICATION_NAME}
