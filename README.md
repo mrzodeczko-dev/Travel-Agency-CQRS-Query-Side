@@ -5,6 +5,7 @@
 [![Kafka](https://img.shields.io/badge/Apache%20Kafka-Streams-black.svg)](https://kafka.apache.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Read%20Model-green.svg)](https://www.mongodb.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![CI](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS/actions/workflows/ci.yml/badge.svg)](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 <a id="toc"></a>
@@ -20,7 +21,6 @@
 - [Tech Stack](#tech-stack)
 - [Testing](#testing)
 - [Repository Structure](#repository-structure)
-- [Roadmap](#roadmap)
 - [Contact](#contact)
 
 ---
@@ -34,10 +34,13 @@ This is the **query side** of a CQRS (Command Query Responsibility Segregation) 
 
 The service consumes domain events published by the command side, builds a denormalized availability read model in MongoDB, and exposes it via a REST API. It does **not** own any business state — it only projects what the command side has already decided.
 
-Two types of events are consumed:
+Three types of events are consumed:
 
-- **`BookingCreated`** — raw booking events processed by Kafka Streams to compute per-hotel, per-day occupancy, then emitted as `AvailabilityUpdated` events.
+- **`BookingCreated`** — booking events processed by Kafka Streams to **increment** per-hotel, per-day occupancy, then emitted as `AvailabilityUpdated` events.
+- **`BookingCancelled`** — cancellation events processed by Kafka Streams to **decrement** per-hotel, per-day occupancy (with a floor of 0).
 - **`HotelUpserted`** — hotel capacity changes that trigger a re-projection of all existing availability records for that hotel.
+
+Both `BookingCreated` and `BookingCancelled` are carried by a single Avro schema `BookingEventAvro` with an `EventType` enum field that determines the delta direction (+1 or −1).
 
 ---
 
@@ -51,12 +54,12 @@ The data flow has two independent paths — occupancy projection and hotel capac
 ```mermaid
 flowchart TD
     subgraph cmd["Command Side"]
-        BS[("BookingCreated topic")]
+        BS[("travel.bookings topic\nBookingEventAvro + EventType enum")]
         HS[("HotelUpserted topic")]
     end
 
     subgraph streams["Query Side - Kafka Streams"]
-        KS["BookingStreamsTopology\nflatMap: booking to one event per day\naggregate: count per hotel:date key"]
+        KS["BookingStreamsTopology\nBookingEventToDeltaProcessor: +1 (Created) / −1 (Cancelled)\nflatMap: expand to one delta per day\naggregate: sum deltas per hotel:date key (floor 0)"]
     end
 
     subgraph consumers["Query Side - Kafka Consumers"]
@@ -70,7 +73,7 @@ flowchart TD
     end
 
     subgraph mongo["MongoDB Read Model"]
-        AV[("daily_availability")]
+        AV[("availability")]
         HT[("hotels")]
     end
 
@@ -93,13 +96,13 @@ flowchart TD
 
 ### Step-by-step
 
-1. **Booking aggregation (Kafka Streams)** — `BookingStreamsTopology` consumes raw `BookingCreated` events. Each booking spanning multiple nights is expanded into one record per day (`flatMap`). A KTable then aggregates the count per `hotelId:date` composite key. Every KTable update emits a new `AvailabilityUpdated` event to the `travel.availability` topic.
+1. **Booking aggregation (Kafka Streams)** — `BookingStreamsTopology` consumes `BookingEventAvro` events from the `travel.bookings` topic. A `BookingEventToDeltaProcessor` reads the `eventType` enum field to determine the delta: `+1` for `BookingCreated`, `−1` for `BookingCancelled`. Each event spanning multiple nights is expanded into one delta per day (`flatMap`). A KTable aggregates the sum of deltas per `hotelId:date` composite key (with `Math.max(0, ...)` to prevent negative occupancy). Every KTable update emits a new `AvailabilityUpdated` event to the `travel.availability` topic.
 
 2. **Availability projection** — `AvailabilityProjectionListener` consumes `AvailabilityUpdated` events and calls `AvailabilityService.update()`. The service fetches the hotel's current capacity, evaluates the availability status (`AVAILABLE` / `LAST_ROOMS` / `SOLD_OUT`) using `AvailabilityStatusPolicy`, and upserts the record in MongoDB.
 
 3. **Hotel capacity upsert** — `HotelCapacityListener` consumes `HotelUpserted` events and calls `HotelCapacityService.upsert()`. The service saves the new capacity and re-projects all existing availability days for that hotel — recalculating status values with the new capacity.
 
-4. **Query** — `GET /api/availability/{hotelId}` reads directly from the MongoDB `daily_availability` collection, optionally filtered by a `from`/`to` date range.
+4. **Query** — `GET /api/availability/{hotelId}` reads directly from the MongoDB `availability` collection, optionally filtered by a `from`/`to` date range.
 
 ### Availability status rules
 
@@ -217,7 +220,7 @@ All services start in dependency order. The application will begin consuming eve
 
 ### 4. Publish test events
 
-To see data in the API you need events from the command side. As a quick workaround, produce a `HotelUpserted` Avro event to `travel.hotels` and a `BookingCreated` event to `travel.bookings` using any Kafka producer that supports the Confluent Schema Registry.
+To see data in the API you need events from the command side. As a quick workaround, produce a `HotelUpserted` Avro event to `travel.hotels` and a `BookingEventAvro` event (with `eventType` set to `BookingCreated`) to `travel.bookings` using any Kafka producer that supports the Confluent Schema Registry.
 
 ---
 
@@ -344,7 +347,7 @@ graph TD
 [↑ Back to top](#toc)
 
 - **Hexagonal Architecture** — application services (`AvailabilityService`, `HotelCapacityService`) have no Spring annotations and are wired manually via `@Bean` in `BeansConfiguration`, keeping them fully independent of the framework.
-- **Kafka Streams aggregation** — `BookingStreamsTopology` uses a KTable to aggregate per-day occupancy counts from raw booking events. `exactly_once_v2` processing guarantee is enabled.
+- **Kafka Streams delta aggregation** — `BookingStreamsTopology` uses a `ContextualFixedKeyProcessor` to convert `BookingEventAvro` events into signed deltas (+1/−1) based on the `EventType` enum. A KTable aggregates these deltas per hotel:date key with a floor of zero. `exactly_once_v2` processing guarantee is enabled.
 - **Avro + Schema Registry** — all events use Avro schemas managed by Confluent Schema Registry, preventing schema drift between the command and query sides.
 - **Dead Letter Topics** — failed consumer records are routed to `.DLT` topics via `DeadLetterPublishingRecoverer` with exponential backoff (1s → 2x → max 10s, 30s total). Deserialization failures skip retries entirely.
 - **Kafka Streams fault tolerance** — uncaught thread exceptions trigger `REPLACE_THREAD` recovery, keeping the streams processing alive without a full restart.
@@ -390,7 +393,7 @@ The project has two layers of tests: fast unit tests (no Spring context) and a f
 | `AvailabilityTest` | Domain model constructor guards, `freeRooms()` including the overbooking edge case |
 | `AvailabilityServiceTest` | Correct capacity lookup, status evaluation, and upsert per update command |
 | `HotelCapacityServiceTest` | Capacity save, full re-projection of existing days, status recalculation, no-op when hotel has no days |
-| `BookingStreamsTopologyTest` | Kafka Streams topology using `TopologyTestDriver` — single/multi-night expansion, aggregation, hotel/date isolation |
+| `BookingStreamsTopologyTest` | Kafka Streams topology using `TopologyTestDriver` — single/multi-night expansion, aggregation, hotel/date isolation, cancellation decrement, floor at zero, mixed create/cancel across hotels |
 
 ### Integration test
 
@@ -417,7 +420,7 @@ travel-agency-query-side/
 ├── src/
 │   ├── main/
 │   │   ├── avro/                               # Avro schemas for all events
-│   │   │   ├── BookingCreated.avsc
+│   │   │   ├── BookingEvent.avsc                # BookingEventAvro + EventType enum (Created/Cancelled)
 │   │   │   ├── AvailabilityUpdated.avsc
 │   │   │   └── HotelUpserted.avsc
 │   │   └── java/com/rzodeczko/
@@ -459,13 +462,6 @@ travel-agency-query-side/
 ```
 
 ---
-
-<a id="roadmap"></a>
-## Roadmap
-
-[↑ Back to top](#toc)
-
-- **Booking cancellations** — the Kafka Streams topology only counts bookings upward; a cancellation event model and corresponding deduction logic is missing.
 
 ---
 

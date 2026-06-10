@@ -1,7 +1,8 @@
 package com.rzodeczko.infrastructure.streams;
 
 import com.rzodeczko.avro.AvailabilityUpdatedAvro;
-import com.rzodeczko.avro.BookingCreatedAvro;
+import com.rzodeczko.avro.BookingEventAvro;
+import com.rzodeczko.avro.EventType;
 import com.rzodeczko.infrastructure.configuration.properties.AppTopicsProperties;
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,11 +37,11 @@ class BookingStreamsTopologyTest {
      */
     private static final String SCHEMA_REGISTRY_URL = "mock://streams-topology-test";
 
-    private static final String BOOKINGS_TOPIC    = "travel.bookings";
+    private static final String BOOKINGS_TOPIC = "travel.bookings";
     private static final String AVAILABILITY_TOPIC = "travel.availability";
 
     private TopologyTestDriver testDriver;
-    private TestInputTopic<String, BookingCreatedAvro>     bookingsTopic;
+    private TestInputTopic<String, BookingEventAvro> bookingsTopic;
     private TestOutputTopic<String, AvailabilityUpdatedAvro> availabilityTopic;
 
     @BeforeEach
@@ -64,16 +66,16 @@ class BookingStreamsTopologyTest {
 
         Map<String, Object> serdeConfig = Map.of("schema.registry.url", SCHEMA_REGISTRY_URL);
 
-        SpecificAvroSerde<BookingCreatedAvro> bookingSerde = new SpecificAvroSerde<>();
-        bookingSerde.configure(serdeConfig, false);
-
-        SpecificAvroSerde<AvailabilityUpdatedAvro> availabilitySerde = new SpecificAvroSerde<>();
-        availabilitySerde.configure(serdeConfig, false);
-
-        bookingsTopic = testDriver.createInputTopic(
-                BOOKINGS_TOPIC, new StringSerializer(), bookingSerde.serializer());
-        availabilityTopic = testDriver.createOutputTopic(
-                AVAILABILITY_TOPIC, new StringDeserializer(), availabilitySerde.deserializer());
+        try (SpecificAvroSerde<BookingEventAvro> bookingSerde = new SpecificAvroSerde<>();
+             SpecificAvroSerde<AvailabilityUpdatedAvro> availabilitySerde = new SpecificAvroSerde<>();
+        ) {
+            bookingSerde.configure(serdeConfig, false);
+            availabilitySerde.configure(serdeConfig, false);
+            bookingsTopic = testDriver.createInputTopic(
+                    BOOKINGS_TOPIC, new StringSerializer(), bookingSerde.serializer());
+            availabilityTopic = testDriver.createOutputTopic(
+                    AVAILABILITY_TOPIC, new StringDeserializer(), availabilitySerde.deserializer());
+        }
     }
 
     @AfterEach
@@ -81,31 +83,30 @@ class BookingStreamsTopologyTest {
         testDriver.close();
     }
 
-    // ── single booking ────────────────────────────────────────────────────────
 
     @Test
     void shouldProduceOneEventForSingleDayBooking() {
-        bookingsTopic.pipeInput("k1", booking(1L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-01"));
 
         List<KeyValue<String, AvailabilityUpdatedAvro>> events = availabilityTopic.readKeyValuesToList();
 
         assertThat(events).hasSize(1);
         AvailabilityUpdatedAvro e = events.get(0).value;
         assertThat(e.getHotelId()).isEqualTo(10L);
-        assertThat(e.getDate()).isEqualTo("2024-06-01");
+        assertThat(e.getDate().toString()).isEqualTo("2024-06-01");
         assertThat(e.getOccupied()).isEqualTo(1L);
     }
 
     @Test
     void shouldExpandMultiNightBookingToOneEventPerNight() {
-        bookingsTopic.pipeInput("k1", booking(1L, 10L, "2024-06-01", "2024-06-03"));
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-03"));
 
         List<KeyValue<String, AvailabilityUpdatedAvro>> events = availabilityTopic.readKeyValuesToList();
 
         // 3 nights → 3 events (one per date)
         assertThat(events).hasSize(3);
         assertThat(events)
-                .extracting(kv -> kv.value.getDate())
+                .extracting(kv -> kv.value.getDate().toString())
                 .containsExactlyInAnyOrder("2024-06-01", "2024-06-02", "2024-06-03");
     }
 
@@ -113,23 +114,23 @@ class BookingStreamsTopologyTest {
 
     @Test
     void shouldAggregateOccupancyAcrossBookingsForSameDay() {
-        bookingsTopic.pipeInput("k1", booking(1L, 10L, "2024-06-01", "2024-06-01"));
-        bookingsTopic.pipeInput("k2", booking(2L, 10L, "2024-06-01", "2024-06-01"));
-        bookingsTopic.pipeInput("k3", booking(3L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k2", createdBooking(2L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k3", createdBooking(3L, 10L, "2024-06-01", "2024-06-01"));
 
         List<KeyValue<String, AvailabilityUpdatedAvro>> all = availabilityTopic.readKeyValuesToList();
 
         // KTable emits on every state change; the last event carries the final count
         AvailabilityUpdatedAvro latest = all.get(all.size() - 1).value;
         assertThat(latest.getHotelId()).isEqualTo(10L);
-        assertThat(latest.getDate()).isEqualTo("2024-06-01");
+        assertThat(latest.getDate().toString()).isEqualTo("2024-06-01");
         assertThat(latest.getOccupied()).isEqualTo(3L);
     }
 
     @Test
     void shouldKeepOccupancyIsolatedBetweenDifferentHotels() {
-        bookingsTopic.pipeInput("k1", booking(1L, 10L, "2024-06-01", "2024-06-01"));
-        bookingsTopic.pipeInput("k2", booking(2L, 20L, "2024-06-01", "2024-06-01"));
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k2", createdBooking(2L, 20L, "2024-06-01", "2024-06-01"));
 
         List<KeyValue<String, AvailabilityUpdatedAvro>> events = availabilityTopic.readKeyValuesToList();
 
@@ -143,27 +144,105 @@ class BookingStreamsTopologyTest {
 
     @Test
     void shouldKeepOccupancyIsolatedBetweenDifferentDatesForSameHotel() {
-        bookingsTopic.pipeInput("k1", booking(1L, 10L, "2024-06-01", "2024-06-01"));
-        bookingsTopic.pipeInput("k2", booking(2L, 10L, "2024-06-02", "2024-06-02"));
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k2", createdBooking(2L, 10L, "2024-06-02", "2024-06-02"));
 
         List<KeyValue<String, AvailabilityUpdatedAvro>> events = availabilityTopic.readKeyValuesToList();
 
         assertThat(events).hasSize(2);
         events.forEach(kv -> assertThat(kv.value.getOccupied()).isEqualTo(1L));
         assertThat(events)
-                .extracting(kv -> kv.value.getDate())
+                .extracting(kv -> kv.value.getDate().toString())
                 .containsExactlyInAnyOrder("2024-06-01", "2024-06-02");
+    }
+
+    // ── cancellation ──────────────────────────────────────────────────────────
+
+    @Test
+    void shouldDecrementOccupancyOnCancellation() {
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k2", createdBooking(2L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k3", cancelledBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+
+        List<KeyValue<String, AvailabilityUpdatedAvro>> all = availabilityTopic.readKeyValuesToList();
+
+        AvailabilityUpdatedAvro latest = all.get(all.size() - 1).value;
+        assertThat(latest.getHotelId()).isEqualTo(10L);
+        assertThat(latest.getDate().toString()).isEqualTo("2024-06-01");
+        assertThat(latest.getOccupied()).isEqualTo(1L);
+    }
+
+    @Test
+    void shouldDecrementOccupancyForEachDayOfCancelledMultiNightBooking() {
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-03"));
+        pipe("k2", createdBooking(2L, 10L, "2024-06-01", "2024-06-03"));
+        pipe("k3", cancelledBooking(1L, 10L, "2024-06-01", "2024-06-03"));
+
+        List<KeyValue<String, AvailabilityUpdatedAvro>> all = availabilityTopic.readKeyValuesToList();
+
+        // Filter the latest event per date
+        Map<String, AvailabilityUpdatedAvro> latestByDate = new HashMap<>();
+        for (KeyValue<String, AvailabilityUpdatedAvro> kv : all) {
+            latestByDate.put(kv.value.getDate().toString(), kv.value);
+        }
+
+        assertThat(latestByDate).hasSize(3);
+        latestByDate.values().forEach(e -> assertThat(e.getOccupied()).isEqualTo(1L));
+    }
+
+    @Test
+    void shouldNotGoBelowZeroOnCancellation() {
+        pipe("k1", cancelledBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+
+        List<KeyValue<String, AvailabilityUpdatedAvro>> all = availabilityTopic.readKeyValuesToList();
+
+        AvailabilityUpdatedAvro latest = all.get(all.size() - 1).value;
+        assertThat(latest.getOccupied()).isZero();
+    }
+
+    @Test
+    void shouldHandleCreateAndCancelForDifferentHotelsIndependently() {
+        pipe("k1", createdBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+        pipe("k2", createdBooking(2L, 20L, "2024-06-01", "2024-06-01"));
+        pipe("k3", cancelledBooking(1L, 10L, "2024-06-01", "2024-06-01"));
+
+        List<KeyValue<String, AvailabilityUpdatedAvro>> all = availabilityTopic.readKeyValuesToList();
+
+        // Hotel 10 should be back to 0, hotel 20 should be at 1
+        Map<Long, Long> latestOccupied = new HashMap<>();
+        for (KeyValue<String, AvailabilityUpdatedAvro> kv : all) {
+            latestOccupied.put(kv.value.getHotelId(), kv.value.getOccupied());
+        }
+
+        assertThat(latestOccupied.get(10L)).isZero();
+        assertThat(latestOccupied.get(20L)).isEqualTo(1L);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private BookingCreatedAvro booking(long id, long hotelId, String start, String end) {
-        return BookingCreatedAvro.newBuilder()
+    private BookingEventAvro createdBooking(long id, long hotelId, String start, String end) {
+        return BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated)
                 .setId(id)
                 .setHotelId(hotelId)
                 .setUserId(999L)
                 .setStart(start)
                 .setEnd(end)
                 .build();
+    }
+
+    private BookingEventAvro cancelledBooking(long id, long hotelId, String start, String end) {
+        return BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCancelled)
+                .setId(id)
+                .setHotelId(hotelId)
+                .setUserId(999L)
+                .setStart(start)
+                .setEnd(end)
+                .build();
+    }
+
+    private void pipe(String key, BookingEventAvro event) {
+        bookingsTopic.pipeInput(key, event);
     }
 }

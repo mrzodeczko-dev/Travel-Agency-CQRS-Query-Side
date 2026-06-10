@@ -1,8 +1,7 @@
 package com.rzodeczko.infrastructure.streams;
 
-
 import com.rzodeczko.avro.AvailabilityUpdatedAvro;
-import com.rzodeczko.avro.BookingCreatedAvro;
+import com.rzodeczko.avro.BookingEventAvro;
 import com.rzodeczko.infrastructure.configuration.properties.AppTopicsProperties;
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +10,8 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.processor.api.ContextualFixedKeyProcessor;
+import org.apache.kafka.streams.processor.api.FixedKeyRecord;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -31,34 +32,40 @@ public class BookingStreamsTopology {
 
     @Bean
     public KStream<String, AvailabilityUpdatedAvro> availabilityTopology(StreamsBuilder builder) {
-        SpecificAvroSerde<BookingCreatedAvro> bookingSerde = new SpecificAvroSerde<>();
-        bookingSerde.configure(Map.of("schema.registry.url", schemaRegistryUrl), false);
+        SpecificAvroSerde<BookingEventAvro> bookingEventSerde = new SpecificAvroSerde<>();
+        bookingEventSerde.configure(Map.of("schema.registry.url", schemaRegistryUrl), false);
 
         SpecificAvroSerde<AvailabilityUpdatedAvro> availabilitySerde = new SpecificAvroSerde<>();
         availabilitySerde.configure(Map.of("schema.registry.url", schemaRegistryUrl), false);
 
-        KStream<String, BookingCreatedAvro> bookings = builder.stream(
+        KStream<String, BookingEventAvro> bookingEvents = builder.stream(
                 topics.bookings(),
-                Consumed.with(Serdes.String(), bookingSerde)
+                Consumed.with(Serdes.String(), bookingEventSerde)
         );
 
-        KStream<String, Long> perDay = bookings.flatMap((key, booking) -> {
-            List<KeyValue<String, Long>> result = new ArrayList<>();
-            LocalDate start = LocalDate.parse(booking.getStart());
-            LocalDate end = LocalDate.parse(booking.getEnd());
+        KStream<String, Long> perDay = bookingEvents
+                .processValues(BookingEventToDeltaProcessor::new)
+                .flatMap((key, occupancyDeltaEntry) -> {
+                    if (occupancyDeltaEntry == null) {
+                        return List.of();
+                    }
 
-            for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
-                String compositeKey = booking.getHotelId() + ":" + d;
-                result.add(KeyValue.pair(compositeKey, 1L));
-            }
-            return result;
-        });
+                    List<KeyValue<String, Long>> result = new ArrayList<>();
+                    LocalDate start = LocalDate.parse(occupancyDeltaEntry.start());
+                    LocalDate end = LocalDate.parse(occupancyDeltaEntry.end());
+
+                    for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+                        String compositeKey = occupancyDeltaEntry.hotelId() + ":" + d;
+                        result.add(KeyValue.pair(compositeKey, occupancyDeltaEntry.delta()));
+                    }
+                    return result;
+                });
 
         KTable<String, Long> occupancy = perDay
                 .groupByKey(Grouped.with(Serdes.String(), Serdes.Long()))
                 .aggregate(
                         () -> 0L,
-                        (k, value, agg) -> agg + value,
+                        (k, value, agg) -> Math.max(0L, agg + value),
                         Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("occupancy-store")
                                 .withKeySerde(Serdes.String())
                                 .withValueSerde(Serdes.Long())
@@ -82,5 +89,33 @@ public class BookingStreamsTopology {
 
         output.to(topics.availability(), Produced.with(Serdes.String(), availabilitySerde));
         return output;
+    }
+
+    record OccupancyDeltaEntry(long hotelId, String start, String end, long delta) {
+    }
+
+    static class BookingEventToDeltaProcessor
+            extends ContextualFixedKeyProcessor<String, BookingEventAvro, OccupancyDeltaEntry> {
+
+        @Override
+        public void process(FixedKeyRecord<String, BookingEventAvro> record) {
+            BookingEventAvro event = record.value();
+            if (event == null) {
+                return;
+            }
+
+            long occupancyDelta = switch (event.getEventType()) {
+                case BookingCreated -> 1L;
+                case BookingCancelled -> -1L;
+            };
+
+            OccupancyDeltaEntry entry = new OccupancyDeltaEntry(
+                    event.getHotelId(),
+                    event.getStart().toString(),
+                    event.getEnd().toString(),
+                    occupancyDelta
+            );
+            context().forward(record.withValue(entry));
+        }
     }
 }

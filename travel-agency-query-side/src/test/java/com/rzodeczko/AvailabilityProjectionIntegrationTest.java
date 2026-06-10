@@ -1,7 +1,8 @@
 package com.rzodeczko;
 
 import com.rzodeczko.avro.AvailabilityUpdatedAvro;
-import com.rzodeczko.avro.BookingCreatedAvro;
+import com.rzodeczko.avro.BookingEventAvro;
+import com.rzodeczko.avro.EventType;
 import com.rzodeczko.avro.HotelUpsertedAvro;
 import com.rzodeczko.domain.model.AvailabilityStatus;
 import com.rzodeczko.infrastructure.persistence.document.AvailabilityDocument;
@@ -238,8 +239,8 @@ class AvailabilityProjectionIntegrationTest {
                 assertThat(hotelRepository.findById(hotelId)).isPresent());
 
         // Step 2: booking arrives on travel.bookings
-        producer.send("travel.bookings", "booking-99-1", BookingCreatedAvro.newBuilder()
-                .setId(1L)
+        producer.send("travel.bookings", "booking-99-1", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(1L)
                 .setHotelId(hotelId)
                 .setUserId(100L)
                 .setStart(date)
@@ -271,16 +272,16 @@ class AvailabilityProjectionIntegrationTest {
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
                 assertThat(hotelRepository.findById(hotelId)).isPresent());
 
-        producer.send("travel.bookings", "booking-98-1", BookingCreatedAvro.newBuilder()
-                .setId(1L).setHotelId(hotelId).setUserId(101L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-2", BookingCreatedAvro.newBuilder()
-                .setId(2L).setHotelId(hotelId).setUserId(102L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-3", BookingCreatedAvro.newBuilder()
-                .setId(3L).setHotelId(hotelId).setUserId(103L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-4", BookingCreatedAvro.newBuilder()
-                .setId(4L).setHotelId(hotelId).setUserId(104L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-5", BookingCreatedAvro.newBuilder()
-                .setId(5L).setHotelId(hotelId).setUserId(105L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking-98-1", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(1L).setHotelId(hotelId).setUserId(101L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking-98-2", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(2L).setHotelId(hotelId).setUserId(102L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking-98-3", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(3L).setHotelId(hotelId).setUserId(103L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking-98-4", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(4L).setHotelId(hotelId).setUserId(104L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking-98-5", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(5L).setHotelId(hotelId).setUserId(105L).setStart(date).setEnd(date).build());
 
         // 5 rooms booked out of 5 -> SOLD_OUT
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
