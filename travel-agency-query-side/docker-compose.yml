@@ -163,6 +163,7 @@ services:
       TOPIC_HOTELS: ${TOPIC_HOTELS}
       TOPIC_HOTELS_DLT: ${TOPIC_HOTELS_DLT}
       LAST_ROOMS_THRESHOLD: ${QUERY_SIDE_LAST_ROOMS_THRESHOLD}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED}
     deploy:
       resources:
         limits:
