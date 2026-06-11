@@ -56,6 +56,12 @@ app:
     default-capacity: ${DEFAULT_HOTEL_CAPACITY} # Fallback capacity for hotels without availability information
     consumer-group: ${HOTELS_CONSUMER_GROUP}
 
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
+
 management:
   endpoints:
     web:
