@@ -51,7 +51,7 @@ import static org.awaitility.Awaitility.await;
  * All components — Kafka Streams serdes, consumer deserializers, and the test producer — share the
  * same in-memory registry via the same URL.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @EmbeddedKafka(
         partitions = 1,
         topics = {
@@ -79,9 +79,8 @@ class AvailabilityProjectionIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        // override the ${SPRING_DATA_MONGODB_URI} placeholder in application.yaml
-        registry.add("spring.mongodb.uri", mongoDBContainer::getConnectionString);
-        registry.add("spring.data.mongodb.uri", mongoDBContainer::getConnectionString);
+        registry.add("spring.mongodb.uri",
+                () -> mongoDBContainer.getConnectionString() + "/test");
     }
 
     @Value("${spring.embedded.kafka.brokers}")
