@@ -282,38 +282,44 @@ All variables are read from `travel-agency-query-side/.env` by Docker Compose.
 The service follows **Hexagonal Architecture (Ports & Adapters)**. The domain and application layers have no dependency on Spring, Kafka, or MongoDB — all infrastructure is injected through explicit output ports.
 
 ```mermaid
-graph TD
-    subgraph presentation["Presentation"]
-        CTL["AvailabilityController"]
+graph LR
+    subgraph driving["🔌 Driving Adapters"]
+        direction TB
+        CTL["🌐 AvailabilityController\n(REST API)"]
+        APL["📨 AvailabilityProjectionListener\n(Kafka Consumer)"]
+        HCL["📨 HotelCapacityListener\n(Kafka Consumer)"]
+        KST["⚡ BookingStreamsTopology\n(Kafka Streams)"]
     end
 
-    subgraph infraKafka["Infrastructure - Kafka"]
-        KST["BookingStreamsTopology"]
-        APL["AvailabilityProjectionListener"]
-        HCL["HotelCapacityListener"]
+    subgraph app["⬡ Application Core"]
+        direction TB
+
+        subgraph portsIn["Ports In"]
+            direction TB
+            GAUC["GetAvailabilityUseCase"]
+            UAUC["UpdateAvailabilityUseCase"]
+            UHUC["UpsertHotelCapacityUseCase"]
+        end
+
+        subgraph services["Services"]
+            direction TB
+            AS["AvailabilityService"]
+            HCS["HotelCapacityService"]
+        end
+
+        subgraph portsOut["Ports Out"]
+            direction TB
+            ARR["AvailabilityReadRepository"]
+            AWR["AvailabilityWriteRepository"]
+            HCP["HotelCapacityProvider"]
+            HCWR["HotelCapacityWriteRepository"]
+        end
     end
 
-    subgraph portsIn["Application - Ports In"]
-        GAUC["GetAvailabilityUseCase"]
-        UAUC["UpdateAvailabilityUseCase"]
-        UHUC["UpsertHotelCapacityUseCase"]
-    end
-
-    subgraph services["Application - Services"]
-        AS["AvailabilityService"]
-        HCS["HotelCapacityService"]
-    end
-
-    subgraph portsOut["Application - Ports Out"]
-        ARR["AvailabilityReadRepository"]
-        AWR["AvailabilityWriteRepository"]
-        HCP["HotelCapacityProvider"]
-        HCWR["HotelCapacityWriteRepository"]
-    end
-
-    subgraph infraMongo["Infrastructure - MongoDB"]
-        MAA["MongoAvailabilityAdapter"]
-        MHCP["MongoHotelCapacityProvider"]
+    subgraph driven["🔌 Driven Adapters"]
+        direction TB
+        MAA["🍃 MongoAvailabilityAdapter\n(MongoDB)"]
+        MHCP["🍃 MongoHotelCapacityProvider\n(MongoDB + Caffeine Cache)"]
     end
 
     CTL --> GAUC
@@ -335,6 +341,13 @@ graph TD
     AWR --> MAA
     HCP --> MHCP
     HCWR --> MHCP
+
+    style driving fill:#e8f4fd,stroke:#2196F3,stroke-width:2px,color:#1565C0
+    style app fill:#fff8e1,stroke:#FF9800,stroke-width:2px,color:#E65100
+    style driven fill:#e8f5e9,stroke:#4CAF50,stroke-width:2px,color:#2E7D32
+    style portsIn fill:#fff3e0,stroke:#FF9800,stroke-width:1px
+    style services fill:#fff9c4,stroke:#FFC107,stroke-width:1px
+    style portsOut fill:#fff3e0,stroke:#FF9800,stroke-width:1px
 ```
 
 ### Hotel capacity fallback
