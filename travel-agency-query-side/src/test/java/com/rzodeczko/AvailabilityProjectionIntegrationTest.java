@@ -15,17 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.test.context.EmbeddedKafka;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mongodb.MongoDBContainer;
-
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -36,52 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-/**
- * Integration tests: real Kafka (embedded) + real MongoDB (Testcontainers).
- *
- * <p>Three levels of coverage:
- * <ol>
- *   <li>Listener only — produce {@code AvailabilityUpdated} directly, verify MongoDB upsert.</li>
- *   <li>Hotel listener — produce {@code HotelUpserted}, verify hotel document and capacity cache.</li>
- *   <li>Full pipeline — produce {@code BookingCreated}, wait for Kafka Streams to emit
- *       {@code AvailabilityUpdated}, then verify MongoDB projection with the correct status.</li>
- * </ol>
- *
- * <p><strong>Schema Registry:</strong> {@code mock://integration-test} (in-process, no Docker needed).
- * All components — Kafka Streams serdes, consumer deserializers, and the test producer — share the
- * same in-memory registry via the same URL.
- */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@EmbeddedKafka(
-        partitions = 1,
-        topics = {
-                "travel.bookings",
-                "travel.availability",
-                "travel.availability.DLT",
-                "travel.hotels",
-                "travel.hotels.DLT"
-        },
-        brokerProperties = {
-                "auto.create.topics.enable=true",           // Kafka Streams creates internal topics at runtime
-                "transaction.state.log.min.isr=1",          // required for single-broker setup
-                "transaction.state.log.replication.factor=1"
-        }
-)
-@Testcontainers
-@ActiveProfiles("integration-test")
-class AvailabilityProjectionIntegrationTest {
-
-    private static final String MOCK_REGISTRY = "mock://integration-test";
-
-    @Container
-    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:8.3.1");
-
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mongodb.uri",
-                () -> mongoDBContainer.getConnectionString() + "/test");
-    }
+class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
 
     @Value("${spring.embedded.kafka.brokers}")
     private String brokerAddresses;
