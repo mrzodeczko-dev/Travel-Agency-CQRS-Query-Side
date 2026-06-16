@@ -127,6 +127,7 @@ Base URL (local): `http://localhost:${SERVER_PORT}` (default: `8081`)
 | Method | Path | Description | Query params | Success | Error codes |
 |--------|------|-------------|-------------|---------|-------------|
 | `GET` | `/api/availability/{hotelId}` | Get availability for a hotel | `from` (ISO date, optional), `to` (ISO date, optional), `page` (int, default `0`), `size` (int, default `30`, max `100`) | `200 OK` | `400` (invalid date range) |
+| `GET` | `/api/hotels/{hotelId}` | Get hotel capacity | — | `200 OK` | `404` (hotel not found) |
 | `GET` | `/actuator/health` | Spring Boot Actuator health | — | `200 OK` | — |
 
 ### cURL examples
@@ -215,7 +216,7 @@ All services start in dependency order. The application will begin consuming eve
 |----------|-----|
 | Availability API | `http://localhost:8081/api/availability/{hotelId}` |
 | Actuator health | `http://localhost:8081/actuator/health` |
-| MongoDB | `localhost:27018` |
+| MongoDB | `localhost:27017` |
 | Kafka broker | `localhost:9092` |
 | Schema Registry | `http://localhost:8200` |
 
@@ -285,6 +286,7 @@ graph LR
     subgraph driving["🔌 Driving Adapters"]
         direction TB
         CTL["🌐 AvailabilityController\n(REST API)"]
+        HCTL["🌐 HotelController\n(REST API)"]
         APL["📨 AvailabilityProjectionListener\n(Kafka Consumer)"]
         HCL["📨 HotelCapacityListener\n(Kafka Consumer)"]
         KST["⚡ BookingStreamsTopology\n(Kafka Streams)"]
@@ -297,6 +299,7 @@ graph LR
             direction TB
             GAUC["GetAvailabilityUseCase"]
             UAUC["UpdateAvailabilityUseCase"]
+            GHCUC["GetHotelCapacityUseCase"]
             UHUC["UpsertHotelCapacityUseCase"]
         end
 
@@ -311,6 +314,7 @@ graph LR
             ARR["AvailabilityReadRepository"]
             AWR["AvailabilityWriteRepository"]
             HCP["HotelCapacityProvider"]
+            HCRR["HotelCapacityReadRepository"]
             HCWR["HotelCapacityWriteRepository"]
         end
     end
@@ -322,16 +326,19 @@ graph LR
     end
 
     CTL --> GAUC
+    HCTL --> GHCUC
     APL --> UAUC
     HCL --> UHUC
 
     GAUC --> AS
     UAUC --> AS
+    GHCUC --> HCS
     UHUC --> HCS
 
     AS --> ARR
     AS --> AWR
     AS --> HCP
+    HCS --> HCRR
     HCS --> HCWR
     HCS --> ARR
     HCS --> AWR
@@ -339,6 +346,7 @@ graph LR
     ARR --> MAA
     AWR --> MAA
     HCP --> MHCP
+    HCRR --> MHCP
     HCWR --> MHCP
 
     style driving fill:#e8f4fd,stroke:#2196F3,stroke-width:2px,color:#1565C0
@@ -408,10 +416,20 @@ The project has two layers of tests: fast unit tests (no Spring context) and int
 |------------|----------------|
 | `AvailabilityStatusPolicyTest` | All status transitions, threshold boundary conditions, constructor validation |
 | `AvailabilityTest` | Domain model constructor guards, `freeRooms()` including the overbooking edge case |
+| `UpdateAvailabilityCommandTest` | Command constructor validation, null date guard |
 | `AvailabilityServiceTest` | Correct capacity lookup, status evaluation, and upsert per update command |
 | `HotelCapacityServiceTest` | Capacity save, full re-projection of existing days, status recalculation, no-op when hotel has no days |
 | `AvailabilityProjectionListenerTest` | Avro event → `UpdateAvailabilityCommand` mapping and use-case delegation |
+| `HotelCapacityListenerTest` | Avro event → use-case delegation for hotel capacity upsert |
 | `BookingStreamsTopologyTest` | Kafka Streams topology using `TopologyTestDriver` — single/multi-night expansion, aggregation, hotel/date isolation, cancellation decrement, floor at zero, mixed create/cancel across hotels |
+| `AvailabilityDocumentTest` | Deterministic `_id` generation (`buildId`), consistency and uniqueness |
+| `AvailabilityDocumentMapperTest` | Document → domain mapping |
+| `MongoAvailabilityAdapterTest` | Date range query selection, upsert delegation to `MongoTemplate` |
+| `ConfigHotelCapacityProviderTest` | Default capacity fallback from configuration |
+| `MongoHotelCapacityProviderTest` | Caffeine cache behavior, MongoDB fallback, hotel isolation |
+| `AvailabilityControllerTest` | REST endpoint responses, date range validation, pagination |
+| `HotelControllerTest` | Hotel capacity endpoint, 404 when hotel not found |
+| `GlobalExceptionHandlerTest` | Exception → HTTP status mapping (400, 404, 500) |
 
 ### Integration tests
 
@@ -446,8 +464,8 @@ travel-agency-query-side/
 │   │       ├── application/
 │   │       │   ├── command/                    # UpdateAvailabilityCommand
 │   │       │   ├── port/
-│   │       │   │   ├── in/                     # GetAvailabilityUseCase, UpdateAvailabilityUseCase, UpsertHotelCapacityUseCase
-│   │       │   │   └── out/                    # AvailabilityReadRepository, AvailabilityWriteRepository, HotelCapacityProvider, HotelCapacityWriteRepository
+│   │       │   │   ├── in/                     # GetAvailabilityUseCase, UpdateAvailabilityUseCase, GetHotelCapacityUseCase, UpsertHotelCapacityUseCase
+│   │       │   │   └── out/                    # AvailabilityReadRepository, AvailabilityWriteRepository, HotelCapacityProvider, HotelCapacityReadRepository, HotelCapacityWriteRepository
 │   │       │   └── service/                    # AvailabilityService, HotelCapacityService
 │   │       ├── domain/
 │   │       │   ├── exception/                  # AvailabilityNotFoundException
@@ -455,16 +473,16 @@ travel-agency-query-side/
 │   │       ├── infrastructure/
 │   │       │   ├── capacity/                   # MongoHotelCapacityProvider, ConfigHotelCapacityProvider
 │   │       │   ├── configuration/              # BeansConfiguration, AppTopicsProperties, PropertiesConfiguration
-│   │       │   ├── kafka/                      # AvailabilityProjectionListener, HotelCapacityListener, KafkaConsumerConfig, KafkaTopicsConfig
+│   │       │   ├── kafka/                      # AvailabilityProjectionListener, HotelCapacityListener, KafkaConsumerConfig
 │   │       │   ├── persistence/
 │   │       │   │   ├── adapter/                # MongoAvailabilityAdapter (read + write port implementation)
 │   │       │   │   ├── document/               # AvailabilityDocument, HotelDocument
 │   │       │   │   ├── mapper/                 # AvailabilityDocumentMapper
 │   │       │   │   └── repository/             # MongoDailyAvailabilityRepository, MongoHotelRepository
-│   │       │   └── streams/                    # BookingStreamsTopology, KafkaStreamsConfig
+│   │       │   └── streams/                    # BookingStreamsTopology, KafkaStreamsConfig, KafkaStreamsStateMetrics
 │   │       └── presentation/
-│   │           ├── controller/                 # AvailabilityController
-│   │           ├── dto/                        # AvailabilityResponseDto, ErrorResponseDto
+│   │           ├── controller/                 # AvailabilityController, HotelController
+│   │           ├── dto/                        # AvailabilityResponseDto, PagedAvailabilityResponseDto, HotelCapacityResponseDto, ErrorResponseDto
 │   │           └── exception/                  # GlobalExceptionHandler, InvalidDateRangeException
 │   └── test/
 │       ├── java/com/rzodeczko/
