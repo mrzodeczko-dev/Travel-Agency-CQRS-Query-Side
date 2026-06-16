@@ -54,19 +54,21 @@ public class KafkaConsumerConfig {
                 }
         );
 
+        ExponentialBackOff backOff = getExponentialBackOff();
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
+        handler.addNotRetryableExceptions(
+                org.springframework.kafka.support.serializer.DeserializationException.class
+        );
+        return handler;
+    }
+
+    private static ExponentialBackOff getExponentialBackOff() {
         ExponentialBackOff backOff = new ExponentialBackOff();
         backOff.setInitialInterval(1000L);
         backOff.setMultiplier(2.0);
         backOff.setMaxInterval(10000L);
         backOff.setMaxElapsedTime(30000L);
-
-        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
-
-        handler.addNotRetryableExceptions(
-                org.springframework.kafka.support.serializer.DeserializationException.class
-        );
-
-        return handler;
+        return backOff;
     }
 
     @Bean

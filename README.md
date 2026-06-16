@@ -369,7 +369,7 @@ graph LR
 - **Hotel capacity re-projection** — when a hotel's capacity changes, all existing availability records are recalculated with the new capacity and updated availability status, ensuring the read model stays consistent.
 - **Deterministic MongoDB document IDs** — availability documents use `hotel_{id}_{date}` as `_id`, making upserts idempotent with no risk of duplicates on reprocessing.
 - **Caffeine L1 cache** — `MongoHotelCapacityProvider` keeps a Caffeine cache (max 10k entries, 30-min TTL) in front of MongoDB, reducing read latency for hotel capacity lookups during availability projection.
-- **OpenTelemetry integration** — distributed tracing and metrics export via OTLP (`spring-boot-starter-opentelemetry`), disabled by default and toggled per environment.
+- **OpenTelemetry integration** _(planned)_ — infrastructure is prepared for distributed tracing and metrics export via OTLP; the dependency will be added when the command side is ready for end-to-end trace propagation.
 - **Java Virtual Threads** — `spring.threads.virtual.enabled: true` for cheaper I/O handling.
 
 ---
@@ -388,8 +388,8 @@ graph LR
 | Database | MongoDB (read model) |
 | Architecture | Hexagonal / Ports & Adapters |
 | Serialization | Avro (`kafka-avro-serializer`, `kafka-streams-avro-serde`), Confluent Platform 8.2.0 |
-| Testing | JUnit 6.x, Testcontainers 2.x (MongoDB), Spring Embedded Kafka, Awaitility |
-| Observability | Spring Boot Actuator, OpenTelemetry (tracing + metrics via OTLP) |
+| Testing | JUnit 6.x, Testcontainers 2.x (ConfluentKafkaContainer, MongoDB), Kafka Streams TopologyTestDriver, Awaitility |
+| Observability | Spring Boot Actuator, OpenTelemetry _(planned — dependency not yet added)_ |
 | Caching | Caffeine (hotel capacity L1 cache) |
 | Containerization | Docker, Docker Compose |
 | Other | Lombok |
@@ -401,7 +401,7 @@ graph LR
 
 [↑ Back to top](#toc)
 
-The project has two layers of tests: fast unit tests (no Spring context) and a full integration test that spins up real infrastructure.
+The project has two layers of tests: fast unit tests (no Spring context) and integration tests that spin up real infrastructure via **Testcontainers** (ConfluentKafkaContainer + MongoDB).
 
 ### Unit tests
 
@@ -411,15 +411,17 @@ The project has two layers of tests: fast unit tests (no Spring context) and a f
 | `AvailabilityTest` | Domain model constructor guards, `freeRooms()` including the overbooking edge case |
 | `AvailabilityServiceTest` | Correct capacity lookup, status evaluation, and upsert per update command |
 | `HotelCapacityServiceTest` | Capacity save, full re-projection of existing days, status recalculation, no-op when hotel has no days |
+| `AvailabilityProjectionListenerTest` | Avro event → `UpdateAvailabilityCommand` mapping and use-case delegation |
 | `BookingStreamsTopologyTest` | Kafka Streams topology using `TopologyTestDriver` — single/multi-night expansion, aggregation, hotel/date isolation, cancellation decrement, floor at zero, mixed create/cancel across hotels |
 
-### Integration test
+### Integration tests
 
 | Test class | What it covers |
 |------------|----------------|
-| `AvailabilityProjectionIntegrationTest` | Full end-to-end flow: `BookingCreated` → Kafka Streams → `AvailabilityUpdated` → MongoDB projection. Uses **Embedded Kafka** for the broker and **Testcontainers** (MongoDB). Covers listener upsert, idempotent overwrite, hotel capacity lookup, status calculation (`LAST_ROOMS`, `SOLD_OUT`), and the complete Streams pipeline with multi-booking aggregation. |
+| `AvailabilityProjectionIntegrationTest` | Full end-to-end flow: `BookingCreated` → Kafka Streams → `AvailabilityUpdated` → MongoDB projection. Uses **Testcontainers** (ConfluentKafkaContainer + MongoDB). Covers listener upsert, idempotent overwrite, hotel capacity lookup, status calculation (`LAST_ROOMS`, `SOLD_OUT`), hotel capacity re-projection, and the complete Streams pipeline with multi-booking aggregation. |
+| `DeadLetterTopicIntegrationTest` | Verifies that undeserializable messages (invalid Avro) are routed to `.DLT` topics via `DeadLetterPublishingRecoverer` for both `travel.availability` and `travel.hotels` consumers. |
 
-**Prerequisites for integration tests:** Docker must be running (Testcontainers starts a MongoDB container).
+**Prerequisites for integration tests:** Docker must be running (Testcontainers starts Kafka and MongoDB containers).
 
 ```bash
 cd travel-agency-query-side
@@ -467,7 +469,9 @@ travel-agency-query-side/
 │   │           └── exception/                  # GlobalExceptionHandler, InvalidDateRangeException
 │   └── test/
 │       ├── java/com/rzodeczko/
-│       │   ├── AvailabilityProjectionIntegrationTest  # Full E2E: EmbeddedKafka + Testcontainers MongoDB
+│       │   ├── AbstractIntegrationTest                # Shared Testcontainers (Kafka + MongoDB) setup
+│       │   ├── AvailabilityProjectionIntegrationTest  # Full E2E: Testcontainers Kafka + MongoDB
+│       │   ├── DeadLetterTopicIntegrationTest          # DLT verification for poison-pill messages
 │       │   ├── application/service/            # AvailabilityServiceTest, HotelCapacityServiceTest
 │       │   ├── domain/model/                   # AvailabilityStatusPolicyTest, AvailabilityTest
 │       │   └── infrastructure/streams/         # BookingStreamsTopologyTest (TopologyTestDriver)

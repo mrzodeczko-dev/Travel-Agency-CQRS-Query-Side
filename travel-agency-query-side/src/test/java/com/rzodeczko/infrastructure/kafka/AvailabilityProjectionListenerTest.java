@@ -28,7 +28,7 @@ class AvailabilityProjectionListenerTest {
     void shouldConvertAvroEventToCommandAndCallUseCase() {
         AvailabilityUpdatedAvro event = AvailabilityUpdatedAvro.newBuilder()
                 .setHotelId(1L)
-                .setDate("2024-06-01")
+                .setDate(LocalDate.of(2024, 6, 1))
                 .setOccupied(50L)
                 .build();
 
@@ -48,7 +48,7 @@ class AvailabilityProjectionListenerTest {
     void shouldParseVariousDateFormats() {
         AvailabilityUpdatedAvro event = AvailabilityUpdatedAvro.newBuilder()
                 .setHotelId(99L)
-                .setDate("2025-12-31")
+                .setDate(LocalDate.of(2025, 12, 31))
                 .setOccupied(0L)
                 .build();
 

@@ -51,8 +51,8 @@ public class BookingStreamsTopology {
                     }
 
                     List<KeyValue<String, Long>> result = new ArrayList<>();
-                    LocalDate start = LocalDate.parse(occupancyDeltaEntry.start());
-                    LocalDate end = LocalDate.parse(occupancyDeltaEntry.end());
+                    LocalDate start = occupancyDeltaEntry.start();
+                    LocalDate end = occupancyDeltaEntry.end();
 
                     for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
                         String compositeKey = occupancyDeltaEntry.hotelId() + ":" + d;
@@ -76,7 +76,7 @@ public class BookingStreamsTopology {
                 .map((compositeKey, occupied) -> {
                     String[] parts = compositeKey.split(":", 2);
                     long hotelId = Long.parseLong(parts[0]);
-                    String date = parts[1];
+                    LocalDate date = LocalDate.parse(parts[1]);
 
                     AvailabilityUpdatedAvro value = AvailabilityUpdatedAvro.newBuilder()
                             .setHotelId(hotelId)
@@ -91,7 +91,7 @@ public class BookingStreamsTopology {
         return output;
     }
 
-    record OccupancyDeltaEntry(long hotelId, String start, String end, long delta) {
+    record OccupancyDeltaEntry(long hotelId, LocalDate start, LocalDate end, long delta) {
     }
 
     static class BookingEventToDeltaProcessor
@@ -111,8 +111,8 @@ public class BookingStreamsTopology {
 
             OccupancyDeltaEntry entry = new OccupancyDeltaEntry(
                     event.getHotelId(),
-                    event.getStart().toString(),
-                    event.getEnd().toString(),
+                    event.getStart(),
+                    event.getEnd(),
                     occupancyDelta
             );
             context().forward(record.withValue(entry));

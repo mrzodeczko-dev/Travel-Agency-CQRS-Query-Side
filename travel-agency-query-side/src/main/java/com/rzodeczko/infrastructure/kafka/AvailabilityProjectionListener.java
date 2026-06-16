@@ -8,8 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -24,7 +22,7 @@ public class AvailabilityProjectionListener {
 
         UpdateAvailabilityCommand command = new UpdateAvailabilityCommand(
                 event.getHotelId(),
-                LocalDate.parse(event.getDate()),
+                event.getDate(),
                 event.getOccupied()
         );
 

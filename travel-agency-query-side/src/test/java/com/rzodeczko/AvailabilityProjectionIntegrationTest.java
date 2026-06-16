@@ -59,7 +59,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
     void shouldUpsertAvailabilityDocumentWhenAvailabilityUpdatedEventArrives() {
         AvailabilityUpdatedAvro event = AvailabilityUpdatedAvro.newBuilder()
                 .setHotelId(1L)
-                .setDate("2024-06-01")
+                .setDate(LocalDate.of(2024, 6, 1))
                 .setOccupied(3L)
                 .build();
 
@@ -81,7 +81,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
     void shouldOverwriteExistingDocumentOnSubsequentAvailabilityUpdatedEvent() {
         // first event
         producer.send("travel.availability", "1", AvailabilityUpdatedAvro.newBuilder()
-                .setHotelId(1L).setDate("2024-06-02").setOccupied(2L).build());
+                .setHotelId(1L).setDate(LocalDate.of(2024, 6, 2)).setOccupied(2L).build());
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
                 assertThat(availabilityRepository.findById(
@@ -90,7 +90,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
 
         // updated count arrives
         producer.send("travel.availability", "1", AvailabilityUpdatedAvro.newBuilder()
-                .setHotelId(1L).setDate("2024-06-02").setOccupied(5L).build());
+                .setHotelId(1L).setDate(LocalDate.of(2024, 6, 2)).setOccupied(5L).build());
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             Optional<AvailabilityDocument> doc = availabilityRepository.findById(
@@ -125,7 +125,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
 
         // 2. Produce availability event with 9 out of 10 rooms occupied -> LAST_ROOMS (threshold 0.9)
         producer.send("travel.availability", "3", AvailabilityUpdatedAvro.newBuilder()
-                .setHotelId(3L).setDate("2024-06-10").setOccupied(9L).build());
+                .setHotelId(3L).setDate(LocalDate.of(2024, 6, 10)).setOccupied(9L).build());
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             Optional<AvailabilityDocument> doc = availabilityRepository.findById(
@@ -147,7 +147,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
                 assertThat(hotelRepository.findById(4L)).isPresent());
 
         producer.send("travel.availability", "4", AvailabilityUpdatedAvro.newBuilder()
-                .setHotelId(4L).setDate("2024-06-10").setOccupied(10L).build());
+                .setHotelId(4L).setDate(LocalDate.of(2024, 6, 10)).setOccupied(10L).build());
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             Optional<AvailabilityDocument> doc = availabilityRepository.findById(
@@ -162,7 +162,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldProjectBookingCreatedEventThroughKafkaStreamsToMongoDB() {
         final long hotelId = 99L;
-        final String date = "2024-08-01";
+        final LocalDate date = LocalDate.of(2024, 8, 1);
 
         // Step 1: establish hotel capacity
         producer.send("travel.hotels", String.valueOf(hotelId), HotelUpsertedAvro.newBuilder()
@@ -197,7 +197,7 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldAggregateMultipleBookingsForSameDayThroughFullPipeline() {
         final long hotelId = 98L;
-        final String date = "2024-09-15";
+        final LocalDate date = LocalDate.of(2024, 9, 15);
 
         producer.send("travel.hotels", String.valueOf(hotelId), HotelUpsertedAvro.newBuilder()
                 .setHotelId(hotelId).setCapacity(5L).build());
@@ -231,8 +231,8 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldReprojectAvailabilityStatusWhenHotelCapacityChanges() {
         final long hotelId = 77L;
-        final String dateA = "2024-07-01";
-        final String dateB = "2024-07-02";
+        final LocalDate dateA = LocalDate.of(2024, 7, 1);
+        final LocalDate dateB = LocalDate.of(2024, 7, 2);
 
         // Step 1: hotel with large capacity
         producer.send("travel.hotels", String.valueOf(hotelId), HotelUpsertedAvro.newBuilder()

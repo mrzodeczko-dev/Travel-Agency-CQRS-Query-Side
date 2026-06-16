@@ -263,6 +263,7 @@
                             <sourceDirectory>src/main/avro</sourceDirectory>
                             <outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
                             <stringType>String</stringType>
+                            <dateTimeLogicalTypeImplementation>JSR310</dateTimeLogicalTypeImplementation>
                         </configuration>
                     </execution>
                 </executions>
@@ -299,6 +300,7 @@
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

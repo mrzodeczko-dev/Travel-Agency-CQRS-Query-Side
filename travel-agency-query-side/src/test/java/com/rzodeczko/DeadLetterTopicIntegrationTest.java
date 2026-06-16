@@ -62,6 +62,7 @@ class DeadLetterTopicIntegrationTest extends AbstractIntegrationTest {
             assertThat(record.value()).isEqualTo(garbage);
         });
 
+        poisonProducer.destroy();
         dltConsumer.close();
     }
 
@@ -97,6 +98,7 @@ class DeadLetterTopicIntegrationTest extends AbstractIntegrationTest {
             assertThat(record.value()).isEqualTo(garbage);
         });
 
+        poisonProducer.destroy();
         dltConsumer.close();
     }
 }
