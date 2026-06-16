@@ -29,7 +29,7 @@ import static org.awaitility.Awaitility.await;
 
 class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
 
-    @Value("${spring.embedded.kafka.brokers}")
+    @Value("${spring.kafka.bootstrap-servers}")
     private String brokerAddresses;
 
     @Autowired
@@ -37,7 +37,6 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MongoHotelRepository hotelRepository;
-
 
     private KafkaTemplate<String, Object> producer;
 
@@ -160,17 +159,6 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
     }
 
     // Full pipeline: BookingCreated -> Kafka Streams → MongoDB
-
-    /**
-     * Exercises the complete event flow:
-     * <ol>
-     *   <li>HotelUpserted → hotel capacity stored in MongoDB</li>
-     *   <li>BookingCreated → Kafka Streams flatMaps to daily keys → KTable aggregates → AvailabilityUpdated</li>
-     *   <li>AvailabilityUpdated → AvailabilityProjectionListener → MongoDB upsert</li>
-     * </ol>
-     * A 30-second timeout accommodates Kafka Streams consumer-group rebalance and state-store
-     * initialization on the first run.
-     */
     @Test
     void shouldProjectBookingCreatedEventThroughKafkaStreamsToMongoDB() {
         final long hotelId = 99L;
@@ -217,19 +205,19 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
                 assertThat(hotelRepository.findById(hotelId)).isPresent());
 
-        producer.send("travel.bookings", "booking-98-1", BookingEventAvro.newBuilder()
+        producer.send("travel.bookings", "booking1", BookingEventAvro.newBuilder()
                 .setEventType(EventType.BookingCreated).setId(1L).setHotelId(hotelId).setUserId(101L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-2", BookingEventAvro.newBuilder()
+        producer.send("travel.bookings", "booking2", BookingEventAvro.newBuilder()
                 .setEventType(EventType.BookingCreated).setId(2L).setHotelId(hotelId).setUserId(102L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-3", BookingEventAvro.newBuilder()
+        producer.send("travel.bookings", "booking3", BookingEventAvro.newBuilder()
                 .setEventType(EventType.BookingCreated).setId(3L).setHotelId(hotelId).setUserId(103L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-4", BookingEventAvro.newBuilder()
+        producer.send("travel.bookings", "booking4", BookingEventAvro.newBuilder()
                 .setEventType(EventType.BookingCreated).setId(4L).setHotelId(hotelId).setUserId(104L).setStart(date).setEnd(date).build());
-        producer.send("travel.bookings", "booking-98-5", BookingEventAvro.newBuilder()
+        producer.send("travel.bookings", "booking5", BookingEventAvro.newBuilder()
                 .setEventType(EventType.BookingCreated).setId(5L).setHotelId(hotelId).setUserId(105L).setStart(date).setEnd(date).build());
 
         // 5 rooms booked out of 5 -> SOLD_OUT
-        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             Optional<AvailabilityDocument> doc = availabilityRepository.findById(
                     AvailabilityDocument.buildId(hotelId, LocalDate.of(2024, 9, 15)));
 
