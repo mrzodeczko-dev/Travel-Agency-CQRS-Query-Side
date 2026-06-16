@@ -4,7 +4,6 @@
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
 [![Kafka](https://img.shields.io/badge/Apache%20Kafka-Streams-black.svg)](https://kafka.apache.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Read%20Model-green.svg)](https://www.mongodb.com/)
-[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tracing-7B61FF.svg?logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)
 [![Caffeine](https://img.shields.io/badge/Caffeine-Cache-6F4E37.svg)](https://github.com/ben-manes/caffeine)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![CI](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS/actions/workflows/ci.yml/badge.svg)](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS/actions/workflows/ci.yml)
