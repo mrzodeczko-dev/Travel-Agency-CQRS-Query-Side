@@ -25,11 +25,11 @@ import java.util.Map;
 public class KafkaConsumerConfig {
 
     @Bean
-    public KafkaTemplate<byte[], byte[]> dltKafkaTemplate(KafkaProperties kafkaProperties) {
+    public KafkaTemplate<String, byte[]> dltKafkaTemplate(KafkaProperties kafkaProperties) {
         Map<String, Object> props = new HashMap<>(kafkaProperties.buildProducerProperties());
         props.put(
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-                org.apache.kafka.common.serialization.ByteArraySerializer.class
+                org.apache.kafka.common.serialization.StringSerializer.class
         );
         props.put(
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
@@ -39,7 +39,7 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public DefaultErrorHandler errorHandler(KafkaTemplate<byte[], byte[]> dltKafkaTemplate) {
+    public DefaultErrorHandler errorHandler(KafkaTemplate<String, byte[]> dltKafkaTemplate) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 dltKafkaTemplate,
                 (record, ex) -> {
