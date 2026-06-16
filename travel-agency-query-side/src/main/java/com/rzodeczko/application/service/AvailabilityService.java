@@ -1,6 +1,7 @@
 package com.rzodeczko.application.service;
 
 import com.rzodeczko.application.command.UpdateAvailabilityCommand;
+import com.rzodeczko.application.dto.PagedResult;
 import com.rzodeczko.application.port.in.GetAvailabilityUseCase;
 import com.rzodeczko.application.port.in.UpdateAvailabilityUseCase;
 import com.rzodeczko.application.port.out.AvailabilityReadRepository;
@@ -54,12 +55,7 @@ public class AvailabilityService implements UpdateAvailabilityUseCase, GetAvaila
     }
 
     @Override
-    public List<Availability> getForHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
-        return availabilityReadRepository.findByHotel(hotelId, from, to, page, size);
-    }
-
-    @Override
-    public long countForHotel(long hotelId, LocalDate from, LocalDate to) {
-        return availabilityReadRepository.countByHotel(hotelId, from, to);
+    public PagedResult<Availability> getPagedForHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
+        return availabilityReadRepository.findPagedByHotel(hotelId, from, to, page, size);
     }
 }

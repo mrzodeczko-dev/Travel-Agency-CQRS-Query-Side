@@ -21,8 +21,4 @@ public interface MongoDailyAvailabilityRepository extends MongoRepository<Availa
     List<AvailabilityDocument> findByHotelIdAndDateBetweenOrderByDateAsc(long hotelId, LocalDate from, LocalDate to);
 
     Page<AvailabilityDocument> findByHotelIdAndDateBetweenOrderByDateAsc(long hotelId, LocalDate from, LocalDate to, Pageable pageable);
-
-    long countByHotelId(long hotelId);
-
-    long countByHotelIdAndDateBetween(long hotelId, LocalDate from, LocalDate to);
 }

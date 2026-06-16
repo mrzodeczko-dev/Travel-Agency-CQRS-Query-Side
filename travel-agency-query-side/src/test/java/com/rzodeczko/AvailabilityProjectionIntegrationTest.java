@@ -229,6 +229,45 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
 
 
     @Test
+    void shouldDecrementOccupancyWhenBookingCancelledEventArrivesThroughFullPipeline() {
+        final long hotelId = 97L;
+        final LocalDate date = LocalDate.of(2024, 10, 1);
+
+        producer.send("travel.hotels", String.valueOf(hotelId), HotelUpsertedAvro.newBuilder()
+                .setHotelId(hotelId).setCapacity(10L).build());
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(hotelRepository.findById(hotelId)).isPresent());
+
+        // 3 bookings created
+        producer.send("travel.bookings", "booking1", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(1L).setHotelId(hotelId).setUserId(201L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking2", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(2L).setHotelId(hotelId).setUserId(202L).setStart(date).setEnd(date).build());
+        producer.send("travel.bookings", "booking3", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCreated).setId(3L).setHotelId(hotelId).setUserId(203L).setStart(date).setEnd(date).build());
+
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            Optional<AvailabilityDocument> doc = availabilityRepository.findById(
+                    AvailabilityDocument.buildId(hotelId, date));
+            assertThat(doc).isPresent();
+            assertThat(doc.get().getOccupied()).isEqualTo(3L);
+        });
+
+        // cancellation -> occupied should drop from 3 to 2
+        producer.send("travel.bookings", "cancel-booking1", BookingEventAvro.newBuilder()
+                .setEventType(EventType.BookingCancelled).setId(4L).setHotelId(hotelId).setUserId(201L).setStart(date).setEnd(date).build());
+
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            Optional<AvailabilityDocument> doc = availabilityRepository.findById(
+                    AvailabilityDocument.buildId(hotelId, date));
+            assertThat(doc).isPresent();
+            assertThat(doc.get().getOccupied()).isEqualTo(2L);
+            assertThat(doc.get().getStatus()).isEqualTo(AvailabilityStatus.AVAILABLE);
+        });
+    }
+
+    @Test
     void shouldReprojectAvailabilityStatusWhenHotelCapacityChanges() {
         final long hotelId = 77L;
         final LocalDate dateA = LocalDate.of(2024, 7, 1);

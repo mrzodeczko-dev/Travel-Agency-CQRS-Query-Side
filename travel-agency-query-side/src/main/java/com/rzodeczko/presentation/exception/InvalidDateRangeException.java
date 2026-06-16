@@ -6,4 +6,8 @@ public class InvalidDateRangeException extends RuntimeException {
     public InvalidDateRangeException(LocalDate from, LocalDate to) {
         super("Invalid date range: from=" + from + " is after to=" + to);
     }
+
+    public InvalidDateRangeException(String message) {
+        super(message);
+    }
 }

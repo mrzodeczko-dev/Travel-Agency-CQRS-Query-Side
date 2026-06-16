@@ -1,5 +1,6 @@
 package com.rzodeczko.presentation.controller;
 
+import com.rzodeczko.application.dto.PagedResult;
 import com.rzodeczko.application.port.in.GetAvailabilityUseCase;
 import com.rzodeczko.domain.model.Availability;
 import com.rzodeczko.presentation.dto.AvailabilityResponseDto;
@@ -47,15 +48,12 @@ public class AvailabilityController {
             @Parameter(description = "Page number (0-based)", example = "0") @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(description = "Page size (1-100)", example = "30") @RequestParam(defaultValue = "30") @Range(min = 1, max = 100) int size) {
 
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new InvalidDateRangeException(from, to);
-        }
+        validateDateRange(from, to);
 
-        List<Availability> result = getAvailabilityUseCase.getForHotel(hotelId, from, to, page, size);
-        long totalElements = getAvailabilityUseCase.countForHotel(hotelId, from, to);
-        int totalPages = (int) Math.ceil((double) totalElements / size);
+        PagedResult<Availability> pagedResult = getAvailabilityUseCase.getPagedForHotel(hotelId, from, to, page, size);
+        int totalPages = (int) Math.ceil((double) pagedResult.totalElements() / size);
 
-        List<AvailabilityResponseDto> content = result.stream()
+        List<AvailabilityResponseDto> content = pagedResult.content().stream()
                 .map(a -> new AvailabilityResponseDto(
                         a.getHotelId(),
                         a.getDate(),
@@ -65,6 +63,15 @@ public class AvailabilityController {
                         a.getStatus()
                 )).toList();
 
-        return ResponseEntity.ok(new PagedAvailabilityResponseDto(content, page, size, totalElements, totalPages));
+        return ResponseEntity.ok(new PagedAvailabilityResponseDto(content, page, size, pagedResult.totalElements(), totalPages));
+    }
+
+    private void validateDateRange(LocalDate from, LocalDate to) {
+        if ((from != null) != (to != null)) {
+            throw new InvalidDateRangeException("Both 'from' and 'to' must be provided together, or neither");
+        }
+        if (from != null && from.isAfter(to)) {
+            throw new InvalidDateRangeException(from, to);
+        }
     }
 }

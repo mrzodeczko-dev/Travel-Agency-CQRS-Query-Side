@@ -1,5 +1,6 @@
 package com.rzodeczko.presentation.controller;
 
+import com.rzodeczko.application.dto.PagedResult;
 import com.rzodeczko.application.port.in.GetAvailabilityUseCase;
 import com.rzodeczko.domain.model.Availability;
 import com.rzodeczko.domain.model.AvailabilityStatus;
@@ -33,8 +34,8 @@ class AvailabilityControllerTest {
     @Test
     void shouldReturnPagedAvailabilityForHotel() throws Exception {
         Availability a = new Availability(HOTEL_ID, DATE, 30, 100, AvailabilityStatus.AVAILABLE);
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, null, null, 0, 30)).thenReturn(List.of(a));
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, null, null)).thenReturn(1L);
+        when(getAvailabilityUseCase.getPagedForHotel(HOTEL_ID, null, null, 0, 30))
+                .thenReturn(new PagedResult<>(List.of(a), 1L));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID))
                 .andExpect(status().isOk())
@@ -55,8 +56,8 @@ class AvailabilityControllerTest {
     void shouldPassDateRangeAndPaginationToUseCase() throws Exception {
         LocalDate from = LocalDate.of(2024, 6, 1);
         LocalDate to = LocalDate.of(2024, 6, 7);
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, from, to, 0, 30)).thenReturn(List.of());
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, from, to)).thenReturn(0L);
+        when(getAvailabilityUseCase.getPagedForHotel(HOTEL_ID, from, to, 0, 30))
+                .thenReturn(new PagedResult<>(List.of(), 0L));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID)
                         .param("from", "2024-06-01")
@@ -64,13 +65,13 @@ class AvailabilityControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(getAvailabilityUseCase).getForHotel(HOTEL_ID, from, to, 0, 30);
+        verify(getAvailabilityUseCase).getPagedForHotel(HOTEL_ID, from, to, 0, 30);
     }
 
     @Test
     void shouldReturnEmptyContentWhenNoData() throws Exception {
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, null, null, 0, 30)).thenReturn(List.of());
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, null, null)).thenReturn(0L);
+        when(getAvailabilityUseCase.getPagedForHotel(HOTEL_ID, null, null, 0, 30))
+                .thenReturn(new PagedResult<>(List.of(), 0L));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID))
                 .andExpect(status().isOk())
@@ -96,8 +97,8 @@ class AvailabilityControllerTest {
                 new Availability(HOTEL_ID, DATE.plusDays(1), 95, 100, AvailabilityStatus.LAST_ROOMS),
                 new Availability(HOTEL_ID, DATE.plusDays(2), 100, 100, AvailabilityStatus.SOLD_OUT)
         );
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, null, null, 0, 30)).thenReturn(list);
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, null, null)).thenReturn(3L);
+        when(getAvailabilityUseCase.getPagedForHotel(HOTEL_ID, null, null, 0, 30))
+                .thenReturn(new PagedResult<>(list, 3L));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID))
                 .andExpect(status().isOk())
@@ -109,8 +110,8 @@ class AvailabilityControllerTest {
 
     @Test
     void shouldAcceptCustomPageAndSize() throws Exception {
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, null, null, 2, 10)).thenReturn(List.of());
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, null, null)).thenReturn(25L);
+        when(getAvailabilityUseCase.getPagedForHotel(HOTEL_ID, null, null, 2, 10))
+                .thenReturn(new PagedResult<>(List.of(), 25L));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID)
                         .param("page", "2")
@@ -121,7 +122,7 @@ class AvailabilityControllerTest {
                 .andExpect(jsonPath("$.totalElements").value(25))
                 .andExpect(jsonPath("$.totalPages").value(3));
 
-        verify(getAvailabilityUseCase).getForHotel(HOTEL_ID, null, null, 2, 10);
+        verify(getAvailabilityUseCase).getPagedForHotel(HOTEL_ID, null, null, 2, 10);
     }
 
     @Test
@@ -153,8 +154,8 @@ class AvailabilityControllerTest {
 
     @Test
     void shouldAcceptMaxAllowedSize() throws Exception {
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, null, null, 0, 100)).thenReturn(List.of());
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, null, null)).thenReturn(0L);
+        when(getAvailabilityUseCase.getPagedForHotel(HOTEL_ID, null, null, 0, 100))
+                .thenReturn(new PagedResult<>(List.of(), 0L));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID)
                         .param("size", "100"))
@@ -163,21 +164,28 @@ class AvailabilityControllerTest {
     }
 
     @Test
-    void shouldAllowOnlyFromParameter() throws Exception {
-        LocalDate from = LocalDate.of(2024, 6, 1);
-        when(getAvailabilityUseCase.getForHotel(HOTEL_ID, from, null, 0, 30)).thenReturn(List.of());
-        when(getAvailabilityUseCase.countForHotel(HOTEL_ID, from, null)).thenReturn(0L);
-
+    void shouldReturnBadRequestWhenOnlyFromIsProvided() throws Exception {
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID)
                         .param("from", "2024-06-01"))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Both")));
 
-        verify(getAvailabilityUseCase).getForHotel(HOTEL_ID, from, null, 0, 30);
+        verifyNoInteractions(getAvailabilityUseCase);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenOnlyToIsProvided() throws Exception {
+        mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID)
+                        .param("to", "2024-06-07"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Both")));
+
+        verifyNoInteractions(getAvailabilityUseCase);
     }
 
     @Test
     void shouldReturn500WhenUseCaseThrowsUnexpectedException() throws Exception {
-        when(getAvailabilityUseCase.getForHotel(anyLong(), any(), any(), anyInt(), anyInt()))
+        when(getAvailabilityUseCase.getPagedForHotel(anyLong(), any(), any(), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("Unexpected"));
 
         mockMvc.perform(get("/api/availability/{hotelId}", HOTEL_ID))

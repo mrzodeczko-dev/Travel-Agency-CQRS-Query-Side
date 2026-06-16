@@ -1,5 +1,6 @@
 package com.rzodeczko.infrastructure.persistence.adapter;
 
+import com.rzodeczko.application.dto.PagedResult;
 import com.rzodeczko.application.port.out.AvailabilityReadRepository;
 import com.rzodeczko.application.port.out.AvailabilityWriteRepository;
 import com.rzodeczko.domain.model.Availability;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.ScrollPosition;
 import org.springframework.data.domain.Window;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -44,22 +46,17 @@ public class MongoAvailabilityAdapter implements
     }
 
     @Override
-    public List<Availability> findByHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
+    public PagedResult<Availability> findPagedByHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
         var pageable = PageRequest.of(page, size);
         var docs = hasDateRange(from, to)
                 ? repository.findByHotelIdAndDateBetweenOrderByDateAsc(hotelId, from, to, pageable)
                 : repository.findByHotelIdOrderByDateAsc(hotelId, pageable);
 
-        return docs.getContent().stream()
+        List<Availability> content = docs.getContent().stream()
                 .map(mapper::toDomain)
                 .toList();
-    }
 
-    @Override
-    public long countByHotel(long hotelId, LocalDate from, LocalDate to) {
-        return hasDateRange(from, to)
-                ? repository.countByHotelIdAndDateBetween(hotelId, from, to)
-                : repository.countByHotelId(hotelId);
+        return new PagedResult<>(content, docs.getTotalElements());
     }
 
     private static boolean hasDateRange(LocalDate from, LocalDate to) {
@@ -89,14 +86,31 @@ public class MongoAvailabilityAdapter implements
         String id = AvailabilityDocument.buildId(availability.getHotelId(), availability.getDate());
         Query query = Query.query(Criteria.where("_id").is(id));
 
-        Update update = new Update()
+        mongoTemplate.upsert(query, buildUpdate(availability), AvailabilityDocument.class);
+    }
+
+    @Override
+    public void bulkUpsert(List<Availability> availabilities) {
+        if (availabilities.isEmpty()) {
+            return;
+        }
+
+        BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, AvailabilityDocument.class);
+        availabilities.forEach(availability -> {
+            String id = AvailabilityDocument.buildId(availability.getHotelId(), availability.getDate());
+            Query query = Query.query(Criteria.where("_id").is(id));
+            bulkOps.upsert(query, buildUpdate(availability));
+        });
+        bulkOps.execute();
+    }
+
+    private Update buildUpdate(Availability availability) {
+        return new Update()
                 .set("hotelId", availability.getHotelId())
                 .set("date", availability.getDate())
                 .set("occupied", availability.getOccupied())
                 .set("capacity", availability.getCapacity())
                 .set("status", availability.getStatus())
                 .set("updatedAt", Instant.now());
-
-        mongoTemplate.upsert(query, update, AvailabilityDocument.class);
     }
 }

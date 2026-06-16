@@ -62,6 +62,7 @@ class HotelCapacityServiceTest {
         verify(capacityWriteRepository).save(HOTEL_ID, 200L);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldReprojectExistingDaysWithNewCapacity() {
         LocalDate date = LocalDate.of(2024, 6, 1);
@@ -70,16 +71,17 @@ class HotelCapacityServiceTest {
 
         service.upsert(HOTEL_ID, 200L);
 
-        ArgumentCaptor<Availability> captor = ArgumentCaptor.forClass(Availability.class);
-        verify(writeRepository).upsert(captor.capture());
+        ArgumentCaptor<List<Availability>> captor = ArgumentCaptor.forClass(List.class);
+        verify(writeRepository).bulkUpsert(captor.capture());
 
-        Availability reprojected = captor.getValue();
+        Availability reprojected = captor.getValue().getFirst();
         assertThat(reprojected.getCapacity()).isEqualTo(200L);
         assertThat(reprojected.getOccupied()).isEqualTo(50);
         assertThat(reprojected.getHotelId()).isEqualTo(HOTEL_ID);
         assertThat(reprojected.getDate()).isEqualTo(date);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldReprojectStatusBasedOnNewCapacity() {
         LocalDate date = LocalDate.of(2024, 6, 1);
@@ -89,14 +91,15 @@ class HotelCapacityServiceTest {
 
         service.upsert(HOTEL_ID, 200L);
 
-        ArgumentCaptor<Availability> captor = ArgumentCaptor.forClass(Availability.class);
-        verify(writeRepository).upsert(captor.capture());
+        ArgumentCaptor<List<Availability>> captor = ArgumentCaptor.forClass(List.class);
+        verify(writeRepository).bulkUpsert(captor.capture());
 
-        assertThat(captor.getValue().getStatus()).isEqualTo(AvailabilityStatus.AVAILABLE);
+        assertThat(captor.getValue().getFirst().getStatus()).isEqualTo(AvailabilityStatus.AVAILABLE);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
-    void shouldReprojectAllDaysForHotel() {
+    void shouldReprojectAllDaysForHotelInSingleBulkUpsert() {
         List<Availability> days = List.of(
                 new Availability(HOTEL_ID, LocalDate.of(2024, 6, 1), 10, 100, AvailabilityStatus.AVAILABLE),
                 new Availability(HOTEL_ID, LocalDate.of(2024, 6, 2), 20, 100, AvailabilityStatus.AVAILABLE),
@@ -106,7 +109,10 @@ class HotelCapacityServiceTest {
 
         service.upsert(HOTEL_ID, 150L);
 
-        verify(writeRepository, times(3)).upsert(any());
+        ArgumentCaptor<List<Availability>> captor = ArgumentCaptor.forClass(List.class);
+        verify(writeRepository).bulkUpsert(captor.capture());
+
+        assertThat(captor.getValue()).hasSize(3);
     }
 
     @Test
@@ -129,11 +135,11 @@ class HotelCapacityServiceTest {
     }
 
     @Test
-    void shouldNotCallWriteRepositoryWhenHotelHasNoDays() {
+    void shouldNotCallBulkUpsertWhenHotelHasNoDays() {
         stubForEachByHotel(HOTEL_ID, List.of());
 
         service.upsert(HOTEL_ID, 100L);
 
-        verifyNoInteractions(writeRepository);
+        verify(writeRepository, never()).bulkUpsert(any());
     }
 }

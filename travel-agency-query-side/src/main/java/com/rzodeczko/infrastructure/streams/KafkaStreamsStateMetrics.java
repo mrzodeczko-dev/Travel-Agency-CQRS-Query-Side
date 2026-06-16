@@ -3,18 +3,16 @@ package com.rzodeczko.infrastructure.streams;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
+import lombok.RequiredArgsConstructor;
 import org.apache.kafka.streams.KafkaStreams;
 import org.springframework.kafka.config.StreamsBuilderFactoryBean;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class KafkaStreamsStateMetrics implements MeterBinder {
 
     private final StreamsBuilderFactoryBean factoryBean;
-
-    public KafkaStreamsStateMetrics(StreamsBuilderFactoryBean factoryBean) {
-        this.factoryBean = factoryBean;
-    }
 
     @Override
     public void bindTo(MeterRegistry registry) {
