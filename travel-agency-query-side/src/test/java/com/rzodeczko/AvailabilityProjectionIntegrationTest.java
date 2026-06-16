@@ -226,4 +226,60 @@ class AvailabilityProjectionIntegrationTest extends AbstractIntegrationTest {
             assertThat(doc.get().getStatus()).isEqualTo(AvailabilityStatus.SOLD_OUT);
         });
     }
+
+
+    @Test
+    void shouldReprojectAvailabilityStatusWhenHotelCapacityChanges() {
+        final long hotelId = 77L;
+        final String dateA = "2024-07-01";
+        final String dateB = "2024-07-02";
+
+        // Step 1: hotel with large capacity
+        producer.send("travel.hotels", String.valueOf(hotelId), HotelUpsertedAvro.newBuilder()
+                .setHotelId(hotelId).setCapacity(100L).build());
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(hotelRepository.findById(hotelId)).isPresent());
+
+        // Step 2: produce availability events (simulating Streams output) for two dates
+        producer.send("travel.availability", String.valueOf(hotelId), AvailabilityUpdatedAvro.newBuilder()
+                .setHotelId(hotelId).setDate(dateA).setOccupied(9L).build());
+        producer.send("travel.availability", String.valueOf(hotelId), AvailabilityUpdatedAvro.newBuilder()
+                .setHotelId(hotelId).setDate(dateB).setOccupied(10L).build());
+
+        // Wait for both days to be persisted with AVAILABLE status (9/100 and 10/100)
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+            Optional<AvailabilityDocument> docA = availabilityRepository.findById(
+                    AvailabilityDocument.buildId(hotelId, LocalDate.of(2024, 7, 1)));
+            Optional<AvailabilityDocument> docB = availabilityRepository.findById(
+                    AvailabilityDocument.buildId(hotelId, LocalDate.of(2024, 7, 2)));
+
+            assertThat(docA).isPresent();
+            assertThat(docA.get().getStatus()).isEqualTo(AvailabilityStatus.AVAILABLE);
+            assertThat(docB).isPresent();
+            assertThat(docB.get().getStatus()).isEqualTo(AvailabilityStatus.AVAILABLE);
+        });
+
+        // Step 3: capacity drops from 100 → 10 → triggers reprojectHotelDays
+        producer.send("travel.hotels", String.valueOf(hotelId), HotelUpsertedAvro.newBuilder()
+                .setHotelId(hotelId).setCapacity(10L).build());
+
+        // Step 4: verify reprojection — 9/10 = LAST_ROOMS, 10/10 = SOLD_OUT
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+            Optional<AvailabilityDocument> docA = availabilityRepository.findById(
+                    AvailabilityDocument.buildId(hotelId, LocalDate.of(2024, 7, 1)));
+            Optional<AvailabilityDocument> docB = availabilityRepository.findById(
+                    AvailabilityDocument.buildId(hotelId, LocalDate.of(2024, 7, 2)));
+
+            assertThat(docA).isPresent();
+            assertThat(docA.get().getCapacity()).isEqualTo(10L);
+            assertThat(docA.get().getOccupied()).isEqualTo(9L);
+            assertThat(docA.get().getStatus()).isEqualTo(AvailabilityStatus.LAST_ROOMS);
+
+            assertThat(docB).isPresent();
+            assertThat(docB.get().getCapacity()).isEqualTo(10L);
+            assertThat(docB.get().getOccupied()).isEqualTo(10L);
+            assertThat(docB.get().getStatus()).isEqualTo(AvailabilityStatus.SOLD_OUT);
+        });
+    }
 }
