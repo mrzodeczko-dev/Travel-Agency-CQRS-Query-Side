@@ -34,7 +34,7 @@ public class MongoAvailabilityAdapter implements
 
     @Override
     public List<Availability> findByHotel(long hotelId, LocalDate from, LocalDate to) {
-        List<AvailabilityDocument> docs = from != null && to != null ?
+        List<AvailabilityDocument> docs = hasDateRange(from, to) ?
                 repository.findByHotelIdAndDateBetweenOrderByDateAsc(hotelId, from, to) :
                 repository.findByHotelIdOrderByDateAsc(hotelId);
 
@@ -46,7 +46,7 @@ public class MongoAvailabilityAdapter implements
     @Override
     public List<Availability> findByHotel(long hotelId, LocalDate from, LocalDate to, int page, int size) {
         var pageable = PageRequest.of(page, size);
-        var docs = from != null && to != null
+        var docs = hasDateRange(from, to)
                 ? repository.findByHotelIdAndDateBetweenOrderByDateAsc(hotelId, from, to, pageable)
                 : repository.findByHotelIdOrderByDateAsc(hotelId, pageable);
 
@@ -57,9 +57,13 @@ public class MongoAvailabilityAdapter implements
 
     @Override
     public long countByHotel(long hotelId, LocalDate from, LocalDate to) {
-        return from != null && to != null
+        return hasDateRange(from, to)
                 ? repository.countByHotelIdAndDateBetween(hotelId, from, to)
                 : repository.countByHotelId(hotelId);
+    }
+
+    private static boolean hasDateRange(LocalDate from, LocalDate to) {
+        return from != null && to != null;
     }
 
     @Override

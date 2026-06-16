@@ -8,8 +8,6 @@ public record AppTopicsProperties(
         String availability,
         String availabilityDlt,
         String hotels,
-        String hotelsDlt,
-        int partitions,
-        int replicas
+        String hotelsDlt
 ) {
 }
