@@ -4,20 +4,24 @@ import com.rzodeczko.application.dto.PagedResult;
 import com.rzodeczko.application.port.in.GetAvailabilityUseCase;
 import com.rzodeczko.domain.model.Availability;
 import com.rzodeczko.domain.model.AvailabilityStatus;
+import com.rzodeczko.infrastructure.configuration.BeansConfiguration;
 import com.rzodeczko.presentation.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 import java.util.List;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest({AvailabilityController.class, GlobalExceptionHandler.class})
 class AvailabilityControllerTest {
@@ -25,7 +29,7 @@ class AvailabilityControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+    @MockitoBean(name = "getAvailabilityUseCase")
     private GetAvailabilityUseCase getAvailabilityUseCase;
 
     private static final long HOTEL_ID = 1L;

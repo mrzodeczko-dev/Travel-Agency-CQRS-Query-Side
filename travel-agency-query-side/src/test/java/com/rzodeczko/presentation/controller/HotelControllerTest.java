@@ -20,7 +20,7 @@ class HotelControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+    @MockitoBean(name = "getHotelCapacityUseCase")
     private GetHotelCapacityUseCase getHotelCapacityUseCase;
 
     @Test
