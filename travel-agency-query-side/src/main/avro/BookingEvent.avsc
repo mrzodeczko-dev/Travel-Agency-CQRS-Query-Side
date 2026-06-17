@@ -8,7 +8,10 @@
       "type": {
         "type": "enum",
         "name": "EventType",
-        "symbols": ["BookingCreated", "BookingCancelled"]
+        "symbols": [
+          "BookingCreated",
+          "BookingCancelled"
+        ]
       }
     },
     {
@@ -25,11 +28,17 @@
     },
     {
       "name": "start",
-      "type": { "type": "int", "logicalType": "date" }
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
     },
     {
       "name": "end",
-      "type": { "type": "int", "logicalType": "date" }
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
     }
   ]
 }

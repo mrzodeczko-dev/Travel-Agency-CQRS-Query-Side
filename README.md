@@ -32,7 +32,7 @@
 
 [↑ Back to top](#toc)
 
-This is the **query side** of a CQRS (Command Query Responsibility Segregation) architecture for a travel agency system. The service is a **portfolio / learning project** built to demonstrate event-driven architecture patterns with Kafka Streams, Hexagonal Architecture, and a MongoDB read model.
+This is the **query side** of a CQRS (Command Query Responsibility Segregation) architecture for a travel agency system. The service is a **portfolio project** demonstrating event-driven architecture patterns with Kafka Streams, Hexagonal Architecture, and a MongoDB read model.
 
 The service consumes domain events published by the command side, builds a denormalized availability read model in MongoDB, and exposes it via a REST API. It does **not** own any business state — it only projects what the command side has already decided.
 
@@ -369,7 +369,7 @@ graph LR
 
 [↑ Back to top](#toc)
 
-- **Hexagonal Architecture** — application services (`AvailabilityService`, `HotelCapacityService`) have no Spring annotations and are wired manually via `@Bean` in `BeansConfiguration`, keeping them fully independent of the framework.
+- **Hexagonal Architecture** — application services (`AvailabilityService`, `HotelCapacityService`) have no Spring annotations and are wired manually via `@Bean` in `BeansConfiguration`, keeping them fully independent of the framework. Architectural boundaries are enforced at build time by **ArchUnit** tests (`HexagonalArchitectureTest`) — verifying layer dependencies, framework isolation (domain and application free of Spring/MongoDB/Kafka imports), and that all ports are interfaces.
 - **Kafka Streams delta aggregation** — `BookingStreamsTopology` uses a `ContextualFixedKeyProcessor` to convert `BookingEventAvro` events into signed deltas (+1/−1) based on the `EventType` enum. A KTable aggregates these deltas per hotel:date key with a floor of zero. `exactly_once_v2` processing guarantee is enabled.
 - **Avro + Schema Registry** — all events use Avro schemas managed by Confluent Schema Registry, preventing schema drift between the command and query sides.
 - **Dead Letter Topics** — failed consumer records are routed to `.DLT` topics via `DeadLetterPublishingRecoverer` with exponential backoff (1s → 2x → max 10s, 30s total). Deserialization failures skip retries entirely.
@@ -394,9 +394,10 @@ graph LR
 | Event streaming | Apache Kafka (KRaft mode), Kafka Streams |
 | Schema management | Apache Avro, Confluent Schema Registry |
 | Database | MongoDB (read model) |
-| Architecture | Hexagonal / Ports & Adapters |
+| Architecture | CQRS (Command Query Responsibility Segregation), Hexagonal / Ports & Adapters |
 | Serialization | Avro (`kafka-avro-serializer`, `kafka-streams-avro-serde`), Confluent Platform 8.2.0 |
 | Testing | JUnit 6.x, Testcontainers 2.x (ConfluentKafkaContainer, MongoDB), Kafka Streams TopologyTestDriver, Awaitility |
+| Architecture enforcement | ArchUnit 1.4.1 (hexagonal boundary validation) |
 | Observability | Spring Boot Actuator, OpenTelemetry _(planned — dependency not yet added)_ |
 | Caching | Caffeine (hotel capacity L1 cache) |
 | Containerization | Docker, Docker Compose |
@@ -431,6 +432,15 @@ The project has two layers of tests: fast unit tests (no Spring context) and int
 | `AvailabilityControllerTest` | REST endpoint responses, date range validation, pagination |
 | `HotelControllerTest` | Hotel capacity endpoint, 404 when hotel not found |
 | `GlobalExceptionHandlerTest` | Exception → HTTP status mapping (400, 404, 500) |
+| `TransactionalGetAvailabilityUseCaseTest` | Transactional decorator delegation for `getForHotel` and `getPagedForHotel` |
+| `TransactionalUpdateAvailabilityUseCaseTest` | Transactional decorator delegation for availability updates |
+| `TransactionalGetHotelCapacityUseCaseTest` | Transactional decorator delegation for hotel capacity lookups |
+| `TransactionalUpsertHotelCapacityUseCaseTest` | Transactional decorator delegation for hotel capacity upserts |
+| `RetryingUpdateAvailabilityUseCaseTest` | Retrying decorator delegation for availability updates |
+| `RetryingUpsertHotelCapacityUseCaseTest` | Retrying decorator delegation for hotel capacity upserts |
+| `KafkaStreamsStateMetricsTest` | Micrometer gauge registration per Kafka Streams state, current/non-current/null values |
+| `KafkaConsumerConfigTest` | Error handler configuration (DefaultErrorHandler presence) |
+| `HexagonalArchitectureTest` | ArchUnit — 13 rules: layer dependencies, framework isolation (domain/application free of Spring/MongoDB/Kafka), ports are interfaces |
 
 ### Integration tests
 
@@ -490,9 +500,12 @@ travel-agency-query-side/
 │       │   ├── AbstractIntegrationTest                # Shared Testcontainers (Kafka + MongoDB) setup
 │       │   ├── AvailabilityProjectionIntegrationTest  # Full E2E: Testcontainers Kafka + MongoDB
 │       │   ├── DeadLetterTopicIntegrationTest          # DLT verification for poison-pill messages
+│       │   ├── HexagonalArchitectureTest        # ArchUnit — hexagonal boundary enforcement (13 rules)
 │       │   ├── application/service/            # AvailabilityServiceTest, HotelCapacityServiceTest
 │       │   ├── domain/model/                   # AvailabilityStatusPolicyTest, AvailabilityTest
-│       │   └── infrastructure/streams/         # BookingStreamsTopologyTest (TopologyTestDriver)
+│       │   ├── infrastructure/kafka/           # KafkaConsumerConfigTest
+│       │   ├── infrastructure/streams/         # BookingStreamsTopologyTest (TopologyTestDriver), KafkaStreamsStateMetricsTest
+│       │   └── infrastructure/transactional/   # Transactional + Retrying decorator tests (6 classes)
 │       └── resources/
 │           └── application-integration-test.yaml
 ├── docker-compose.yml                          # Application + MongoDB + Kafka (KRaft) + Schema Registry
