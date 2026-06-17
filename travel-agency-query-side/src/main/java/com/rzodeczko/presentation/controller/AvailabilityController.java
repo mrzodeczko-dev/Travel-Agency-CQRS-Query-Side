@@ -2,7 +2,6 @@ package com.rzodeczko.presentation.controller;
 
 import com.rzodeczko.application.dto.PagedResult;
 import com.rzodeczko.application.port.in.GetAvailabilityUseCase;
-import com.rzodeczko.domain.model.Availability;
 import com.rzodeczko.presentation.dto.AvailabilityResponseDto;
 import com.rzodeczko.presentation.dto.PagedAvailabilityResponseDto;
 import com.rzodeczko.presentation.exception.InvalidDateRangeException;
@@ -14,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.validator.constraints.Range;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -25,10 +25,14 @@ import java.util.List;
 @Validated
 @RestController
 @RequestMapping("/api/availability")
-@RequiredArgsConstructor
 @Tag(name = "Availability", description = "Hotel room availability queries")
 public class AvailabilityController {
     private final GetAvailabilityUseCase getAvailabilityUseCase;
+
+    public AvailabilityController(
+            @Qualifier("getAvailabilityUseCase") GetAvailabilityUseCase getAvailabilityUseCase) {
+        this.getAvailabilityUseCase = getAvailabilityUseCase;
+    }
 
     @Operation(
             summary = "Get hotel availability",
@@ -50,7 +54,7 @@ public class AvailabilityController {
 
         validateDateRange(from, to);
 
-        PagedResult<Availability> pagedResult = getAvailabilityUseCase.getPagedForHotel(hotelId, from, to, page, size);
+        var pagedResult = getAvailabilityUseCase.getPagedForHotel(hotelId, from, to, page, size);
         int totalPages = (int) Math.ceil((double) pagedResult.totalElements() / size);
 
         List<AvailabilityResponseDto> content = pagedResult.content().stream()
@@ -60,14 +64,14 @@ public class AvailabilityController {
                         a.getOccupied(),
                         a.getCapacity(),
                         a.freeRooms(),
-                        a.getStatus()
+                        a.getStatus().name()
                 )).toList();
 
         return ResponseEntity.ok(new PagedAvailabilityResponseDto(content, page, size, pagedResult.totalElements(), totalPages));
     }
 
     private void validateDateRange(LocalDate from, LocalDate to) {
-        if ((from != null) != (to != null)) {
+        if ((from == null) == (to != null)) {
             throw new InvalidDateRangeException("Both 'from' and 'to' must be provided together, or neither");
         }
         if (from != null && from.isAfter(to)) {

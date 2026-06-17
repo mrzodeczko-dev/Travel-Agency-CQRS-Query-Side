@@ -1,7 +1,5 @@
 package com.rzodeczko.presentation.dto;
 
-import com.rzodeczko.domain.model.AvailabilityStatus;
-
 import java.time.LocalDate;
 
 public record AvailabilityResponseDto(
@@ -10,6 +8,6 @@ public record AvailabilityResponseDto(
         long occupied,
         long capacity,
         long freeRooms,
-        AvailabilityStatus status
+        String status
 ) {
 }

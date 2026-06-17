@@ -33,6 +33,7 @@
         <junit-jupiter.version>6.0.3</junit-jupiter.version>
         <jacoco.version>0.8.14</jacoco.version>
         <springdoc.version>3.0.3</springdoc.version>
+        <spring.retry.version>2.0.12</spring.retry.version>
     </properties>
     <repositories>
         <repository>
@@ -138,6 +139,11 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+            <version>${spring.retry.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -263,7 +269,6 @@
                             <sourceDirectory>src/main/avro</sourceDirectory>
                             <outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
                             <stringType>String</stringType>
-                            <dateTimeLogicalTypeImplementation>JSR310</dateTimeLogicalTypeImplementation>
                         </configuration>
                     </execution>
                 </executions>

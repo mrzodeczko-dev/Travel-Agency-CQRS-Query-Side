@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,11 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/hotels")
-@RequiredArgsConstructor
 @Tag(name = "Hotels", description = "Hotel capacity management")
 public class HotelController {
 
     private final GetHotelCapacityUseCase getHotelCapacityUseCase;
+
+    public HotelController(
+            @Qualifier("getHotelCapacityUseCase") GetHotelCapacityUseCase getHotelCapacityUseCase) {
+        this.getHotelCapacityUseCase = getHotelCapacityUseCase;
+    }
 
     @Operation(summary = "Get hotel capacity", description = "Returns hotel capacity information by hotel ID")
     @ApiResponses({

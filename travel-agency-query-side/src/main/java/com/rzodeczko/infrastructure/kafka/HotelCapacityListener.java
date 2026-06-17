@@ -2,16 +2,20 @@ package com.rzodeczko.infrastructure.kafka;
 
 import com.rzodeczko.application.port.in.UpsertHotelCapacityUseCase;
 import com.rzodeczko.avro.HotelUpsertedAvro;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class HotelCapacityListener {
     private final UpsertHotelCapacityUseCase upsertHotelCapacityUseCase;
+
+    public HotelCapacityListener(
+            @Qualifier("retryingUpsertHotelCapacity") UpsertHotelCapacityUseCase upsertHotelCapacityUseCase) {
+        this.upsertHotelCapacityUseCase = upsertHotelCapacityUseCase;
+    }
 
     @KafkaListener(
             topics = "${app.topics.hotels}",
