@@ -16,7 +16,6 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.resilience.annotation.Retryable;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
